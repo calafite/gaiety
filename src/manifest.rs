@@ -21,7 +21,7 @@ pub struct ModuleMeta {
     pub requires_cmd: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, Clone)]
 pub struct ApiMeta {
     #[serde(default)]
     pub functions: Vec<String>,
@@ -29,4 +29,6 @@ pub struct ApiMeta {
     pub variables: Vec<String>,
     #[serde(default)]
     pub aliases: HashMap<String, String>,
+    #[serde(default)]
+    pub completions: HashMap<String, String>,
 }
