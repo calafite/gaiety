@@ -3,6 +3,7 @@ pub mod init;
 pub mod list;
 pub mod new;
 pub mod rm;
+pub mod rename;
 
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
@@ -54,11 +55,18 @@ pub enum Commands {
     },
     /// Remove a module and its directory
     Rm {
-    /// Name of the module to remove
-    module: String,
-    /// Directory to remove the module from (defaults to last in GAI_DIRS)
-    #[arg(short, long)]
-    target: Option<PathBuf>,
+        /// Name of the module to remove
+        module: String,
+        /// Directory to remove the module from (defaults to last in GAI_DIRS)
+        #[arg(short, long)]
+        target: Option<PathBuf>,
+    },
+    /// Rename a module
+    Rename {
+        /// Current module name
+        old: String,
+        /// New module name
+        new: String,
     },
 }
 
