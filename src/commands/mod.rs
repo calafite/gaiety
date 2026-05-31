@@ -53,13 +53,14 @@ pub enum Commands {
         #[arg(short, long)]
         target: Option<PathBuf>,
     },
-    /// Remove a module and its directory
+    /// Remove a module and renumber remaining modules in its directory
     Rm {
         /// Name of the module to remove
         module: String,
-        /// Directory to remove the module from (defaults to last in GAI_DIRS)
+        /// Only remove the module if it lives in this directory.
+        /// Useful when the same module name exists in multiple GAI_DIRS entries.
         #[arg(short, long)]
-        target: Option<PathBuf>,
+        dir: Option<PathBuf>,
     },
     /// Rename a module
     Rename {
@@ -76,7 +77,7 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
-        Commands::Rm { module, target } => rm::run(cli.dirs, module, target),
+        Commands::Rm { module, dir } => rm::run(cli.dirs, module, dir),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
     }
 }

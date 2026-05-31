@@ -5,32 +5,54 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result<()> {
+pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    let target_module = modules.iter().find(|m| m.manifest.module.name == module_name);
+    let candidate = modules.iter().find(|m| {
+        if m.manifest.module.name != module_name {
+            return false;
+        }
+        match &dir_filter {
+            Some(filter) => m.path.parent().map_or(false, |p| p == filter),
+            None => true,
+        }
+    });
 
-    let m = match target_module {
+    let m = match candidate {
         Some(m) => m,
-        None => bail!("Module '{}' not found.", module_name),
+        None => match &dir_filter {
+            Some(filter) => bail!(
+                "Module '{}' not found in '{}'.",
+                module_name,
+                filter.display()
+            ),
+            None => bail!("Module '{}' not found.", module_name),
+        },
     };
 
-    println!("\n{} {}\n", "::".bold().cyan(), format!("Remove Module: {}", module_name).bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        format!("Remove Module: {}", module_name).bold().cyan()
+    );
     println!("  {} {}\n", "path:".dimmed(), m.path.display());
 
-    print!("{} Remove module '{}'? [y/N] ", "?".bold().yellow(), module_name);
+    print!(
+        "{} Remove module '{}'? [y/N] ",
+        "?".bold().yellow(),
+        module_name
+    );
     io::stdout().flush()?;
 
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
 
-    if input.trim().eq_ignore_ascii_case("y") {
-        let module_parent = m.path.parent().unwrap().to_path_buf();
+    if input.trim().eq_ignore_ascii_case("y") { 
+        let module_dir = m.path.parent().unwrap().to_path_buf();
         fs::remove_dir_all(&m.path)?;
         println!("{} deleted: {}", "✓".bold().green(), m.path.display());
-        let write_dir = target.unwrap_or(module_parent);
-        renumber_modules(&write_dir)?;
+        renumber_modules(&module_dir)?;
     } else {
         println!("{} aborted", "!".bold().yellow());
     }
@@ -54,7 +76,12 @@ fn renumber_modules(dir: &PathBuf) -> Result<()> {
         let new_name = format!("{:02}_{}", i + 1, suffix);
         if dir_name != new_name {
             fs::rename(path, dir.join(&new_name))?;
-            println!("{} renamed: {} → {}", "↻".bold().blue(), dir_name, new_name);
+            println!(
+                "{} renumbered: {} → {}",
+                "↻".bold().blue(),
+                dir_name,
+                new_name
+            );
         }
     }
 
