@@ -8,9 +8,13 @@ impl Loader {
     pub(crate) fn discover_modules(&self) -> Result<Vec<DiscoveredModule>> {
         let mut modules = Vec::new();
         if !self.dir.exists() {
+            eprintln!(
+                "{} modules directory does not exist: {}",
+                "warn:".bold().yellow(),
+                self.dir.display()
+                );
             return Ok(modules);
         }
-
         for entry in fs::read_dir(&self.dir).context("Failed to read modules directory")? {
             let entry = entry?;
             let path = entry.path();
