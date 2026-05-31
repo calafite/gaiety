@@ -19,6 +19,8 @@ pub struct ModuleMeta {
     pub tags: Vec<String>,
     #[serde(default)]
     pub requires_cmd: Vec<String>,
+    #[serde(default)]
+    pub requires_any_cmd: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone)]
@@ -32,3 +34,4 @@ pub struct ApiMeta {
     #[serde(default)]
     pub completions: HashMap<String, String>,
 }
+
