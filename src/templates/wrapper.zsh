@@ -6,11 +6,11 @@ gai() {
             eval "$(gaiety init)"
             echo "\033[1m\033[32m✓ \033[0mgaiety reloaded"
             ;;
-        list|info|new|rm)
+        list|info|new|rm|rename)
             gaiety "$@"
             ;;
         *)
-            echo "Usage: gai [reload|list|info <name>|new <name>|rm <name>]rename <old> <new>"
+            echo "Usage: gai [reload|list|info <name>|new <name>|rm <name>|rename <old> <new>]"
             ;;
     esac
 }

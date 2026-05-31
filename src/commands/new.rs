@@ -23,9 +23,14 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
     }
 
     let write_dir = target.unwrap_or_else(|| loader.default_write_dir().clone());
+    let write_dir_index = loader.dirs.iter().position(|d| d == &write_dir);
 
     let max_prefix = modules
         .iter()
+        .filter(|m| match write_dir_index {
+            Some(idx) => m.dir_index == idx,
+            None => m.path.parent().map_or(false, |p| p == write_dir),
+        })
         .filter_map(|m| m.prefix_order)
         .max()
         .unwrap_or(0);
