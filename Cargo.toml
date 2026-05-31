@@ -8,6 +8,7 @@ anyhow = "*"
 clap = { version = "*", features = ["derive", "env"] }
 serde = { version = "*", features = ["derive"] }
 toml = "*"
+toml_edit = "*"
 colored = "*"
 shellexpand = "*"
 
