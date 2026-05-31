@@ -16,9 +16,9 @@ pub fn run(dir: PathBuf) -> Result<()> {
 
         let status_colored = match &m.status {
             ModuleStatus::Loaded => format!("{:<8}", "loaded").green(),
-            ModuleStatus::SkippedMissingCmd(_) | ModuleStatus::SkippedMissingDep(_) => {
-                format!("{:<8}", "skipped").yellow()
-            }
+            ModuleStatus::SkippedMissingCmd(_)
+            | ModuleStatus::SkippedMissingAnyCmd(_)
+            | ModuleStatus::SkippedMissingDep(_) => format!("{:<8}", "skipped").yellow(),
         };
 
         let version_colored = format!("v{:<7}", m.manifest.module.version).dimmed();
@@ -42,13 +42,18 @@ pub fn run(dir: PathBuf) -> Result<()> {
                 let msg = format!("↳ missing required command: {}", cmd);
                 println!("    {}", msg.yellow());
             }
+            ModuleStatus::SkippedMissingAnyCmd(cmds) => {
+                let msg = format!("↳ none of these commands found: {}", cmds.join(", "));
+                println!("    {}", msg.yellow());
+            }
             ModuleStatus::SkippedMissingDep(dep) => {
                 let msg = format!("↳ missing or skipped dependency: {}", dep);
                 println!("    {}", msg.yellow());
             }
-            _ => {}
+            ModuleStatus::Loaded => {}
         }
     }
     println!();
     Ok(())
 }
+

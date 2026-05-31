@@ -20,7 +20,9 @@ impl Loader {
         let mut modules = self.discover_modules()?;
         self.sort_modules(&mut modules);
         self.validate_commands(&mut modules);
+        self.validate_any_commands(&mut modules);
         self.validate_dependencies(&mut modules);
         Ok(modules)
     }
 }
+

@@ -13,5 +13,7 @@ pub struct DiscoveredModule {
 pub enum ModuleStatus {
     Loaded,
     SkippedMissingCmd(String),
+    SkippedMissingAnyCmd(Vec<String>),
     SkippedMissingDep(String),
 }
+

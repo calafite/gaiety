@@ -26,7 +26,7 @@ fn styles() -> Styles {
 )]
 pub struct Cli {
     /// Directory containing the modules
-    #[arg(short, long, global = true, default_value = ".")]
+    #[arg(short, long, global = true, env = "ZRT_DIR", default_value = ".")]
     pub dir: PathBuf,
 
     #[command(subcommand)]

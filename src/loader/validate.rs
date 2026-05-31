@@ -15,6 +15,18 @@ impl Loader {
         }
     }
 
+    pub(crate) fn validate_any_commands(&self, modules: &mut [DiscoveredModule]) {
+        for m in modules.iter_mut() {
+            if m.status != ModuleStatus::Loaded {
+                continue;
+            }
+            let cmds = &m.manifest.module.requires_any_cmd;
+            if !cmds.is_empty() && !cmds.iter().any(|cmd| self.has_command(cmd)) {
+                m.status = ModuleStatus::SkippedMissingAnyCmd(cmds.clone());
+            }
+        }
+    }
+
     pub(crate) fn validate_dependencies(&self, modules: &mut [DiscoveredModule]) {
         let mut changed = true;
         while changed {
@@ -56,3 +68,4 @@ impl Loader {
         false
     }
 }
+
