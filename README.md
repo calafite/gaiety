@@ -1,11 +1,14 @@
 # gaiety
 
-Minimalist zsh-based runtime module loader. Write modular shell configuration files, declare dependencies and public APIs in manifests. Gaiety handles load order, validation and cleanup.
+A minimal Zsh runtime module loader. Write modular shell config, declare dependencies and public API in a manifest, and let gaiety handle load order, validation, and cleanup.
 
 ---
+
+## Installation
+
 ### Shell setup
 
-On `.zshrc`:
+Add to your `.zshrc`:
 
 ```zsh
 export GAI_DIRS="/usr/share/gaiety/modules:~/.config/gaiety/modules"
@@ -22,10 +25,10 @@ Each module is a directory containing two files:
 
 ```
 ~/.config/gaiety/modules/
-  01_list/
+  01_core/
     module.toml
     init.zsh
-  02_comp/
+  02_list/
     module.toml
     init.zsh
 ```
@@ -39,34 +42,34 @@ The numeric prefix controls load order. Gaps are fine, as gaiety renumbers autom
 name        = "list"
 description = "Directory listing with eza/exa"
 version     = "1.0.0"
-deps        = []
+deps        = ["core"]
 tags        = []
 
-# gaiety skips if ANY of these binaries are unavailable
+# Skip this module if none of these commands exist
 requires_cmd     = []
 
-# gaiety skips if ALL of these binaries are unavailable
+# Skip this module if none of these commands exist (OR logic)
 requires_any_cmd = ["eza", "exa"]
 
 [api]
-# the functions this module exposes
-# unloaded on reload
+# Functions this module exposes (unloaded on reload)
 functions  = ["ls", "ll", "la", "lt", "lta", "help_ls"]
 
-# variables this module sets (unset on reload)
+# Variables this module sets (unset on reload)
 variables  = []
 
-# shell aliases (registered and unregistered automatically)
+# Shell aliases (registered and unregistered automatically)
 # aliases = { top = "btop" }
 
-# completion bindings: { "command" = "_completion_fn" }
+# Completion bindings: { "command" = "_completion_fn" }
 # completions = { "lt" = "_rt_comp_dirs" }
 ```
 
 ### init.zsh
 
-Plain zsh scripts. The manifest declares what it exposes, whilst the script implements it.
-It is convention to prefix internal functions with `_modulename_` to avoid name collisions.
+Plain zsh. No magic — just source a file. The manifest declares what it exposes; the script implements it.
+
+Convention: prefix internal functions with `_modulename_` to avoid collisions.
 
 ```zsh
 _list_ls() { eza --icons --group-directories-first "$@"; }
@@ -129,9 +132,9 @@ gai rm mything
 
 A module can be skipped at load time if:
 
-- `requires_cmd` ~ one of the listed commands is not in `PATH`
-- `requires_any_cmd` ~ none of the listed commands are in `PATH`
-- `deps` ~ a declared dependency was not loaded (cascades)
+- `requires_cmd` — one of the listed commands is not in `PATH`
+- `requires_any_cmd` — none of the listed commands are in `PATH`
+- `deps` — a declared dependency was not loaded (cascades)
 
 Skipped modules are visible in `gai list` with a reason. Their `init.zsh` is not sourced and their API is not registered.
 
@@ -161,10 +164,10 @@ The function must be defined somewhere in a loaded `init.zsh`. gaiety will warn 
 Common completions:
 
 ```zsh
-# directories only
+# Directories only
 _rt_comp_dirs() { _path_files -/; }
 
-# files and directories
+# Files and directories
 _rt_comp_paths() { _path_files; }
 ```
 
@@ -174,5 +177,5 @@ _rt_comp_paths() { _path_files; }
 
 - Module names must match `[a-zA-Z_][a-zA-Z0-9_]*`
 - Use `requires_any_cmd` for modules with multiple binary options (e.g. `eza`/`exa`)
-- Keep internal functions prefixed. Public API is what goes in `functions` in the manifest
+- Keep internal functions prefixed — public API is what goes in `functions` in the manifest
 - `gai info <name>` is useful for debugging what a module actually exposes
