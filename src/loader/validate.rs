@@ -1,6 +1,5 @@
 use super::types::{DiscoveredModule, ModuleStatus};
 use super::Loader;
-use colored::Colorize;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
@@ -66,8 +65,8 @@ impl Loader {
             }
         }
     }
-
-    pub(crate) fn validate_completions(&self, modules: &mut [DiscoveredModule]) {
+ 
+    pub fn check_completions(&self, modules: &[DiscoveredModule]) -> Vec<String> {
         let all_content: String = modules
             .iter()
             .filter(|m| m.status == ModuleStatus::Loaded)
@@ -77,21 +76,21 @@ impl Loader {
             })
             .collect();
 
-        for m in modules.iter_mut() {
+        let mut warnings = Vec::new();
+        for m in modules {
             if m.status != ModuleStatus::Loaded {
                 continue;
             }
             for comp_fn in m.manifest.api.completions.values() {
                 if !all_content.contains(comp_fn.as_str()) {
-                    eprintln!(
-                        "{} module '{}': completion function '{}' not found in any init.zsh",
-                        "warn:".bold().yellow(),
-                        m.manifest.module.name,
-                        comp_fn
-                    );
+                    warnings.push(format!(
+                        "module '{}': completion function '{}' not found in any init.zsh",
+                        m.manifest.module.name, comp_fn
+                    ));
                 }
             }
         }
+        warnings
     }
 
     fn has_command(&self, cmd: &str) -> bool {

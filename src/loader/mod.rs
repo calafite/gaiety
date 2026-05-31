@@ -39,7 +39,6 @@ impl Loader {
         self.validate_commands(&mut modules);
         self.validate_any_commands(&mut modules);
         self.validate_dependencies(&mut modules);
-        self.validate_completions(&mut modules);
         Ok(modules)
     }
 
