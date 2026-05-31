@@ -31,17 +31,17 @@ impl Loader {
         let mut changed = true;
         while changed {
             changed = false;
-
-            let loaded_names: Vec<String> = modules
+            
+            let loaded_names: std::collections::HashSet<&str> = modules
                 .iter()
                 .filter(|m| m.status == ModuleStatus::Loaded)
-                .map(|m| m.manifest.module.name.clone())
+                .map(|m| m.manifest.module.name.as_str())
                 .collect();
 
             for m in modules.iter_mut() {
                 if m.status == ModuleStatus::Loaded {
                     for dep in &m.manifest.module.deps {
-                        if !loaded_names.contains(dep) {
+                        if !loaded_names.contains(dep.as_str()) {
                             m.status = ModuleStatus::SkippedMissingDep(dep.clone());
                             changed = true;
                             break;
