@@ -2,7 +2,8 @@
 name        = "{{MODULE_NAME}}"
 description = "Write a short description here"
 version     = "1.0.0"
-deps        = ["core"]
+deps        = []
+#deps = [{ name = "example", version = ">=1.0.0" }]
 tags        = []
 requires_cmd     = []
 requires_any_cmd = []
@@ -12,4 +13,3 @@ functions  = ["help_{{MODULE_NAME}}"]
 variables  = []
 # aliases      = { top = "btop" }
 # completions  = { "help_{{MODULE_NAME}}" = "_files" }
-

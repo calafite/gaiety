@@ -6,6 +6,7 @@ pub struct DiscoveredModule {
     pub path: PathBuf,
     pub manifest: Manifest,
     pub prefix_order: Option<u32>,
+    pub dir_index: usize,
     pub status: ModuleStatus,
 }
 

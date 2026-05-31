@@ -100,7 +100,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         if m.manifest.module.name == old_name {
             continue;
         }
-        if m.manifest.module.deps.contains(&old_name) {
+        if m.manifest.module.deps.iter().any(|d| d.name == old_name) {
             let path = m.path.join("module.toml");
             let content = fs::read_to_string(&path)?;
             let updated = replace_dep(&content, &old_name, &new_name);

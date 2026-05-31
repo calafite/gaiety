@@ -25,10 +25,16 @@ pub fn run(dirs: String) -> Result<()> {
         let deps = if m.manifest.module.deps.is_empty() {
             "[]".to_string()
         } else {
-            format!("[{}]", m.manifest.module.deps.join(", "))
+            format!("[{}]", m.manifest.module.deps.iter()
+            .map(|d| match &d.version {
+                Some(v) => format!("{}@{}", d.name, v),
+                None => d.name.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join(", "))
         };
-        let deps_colored = format!("deps:{:<22}", deps).dimmed();
 
+        let deps_colored = format!("deps:{:<22}", deps).dimmed();
         let file_colored = m.path.file_name().unwrap().to_string_lossy().dimmed();
 
         println!(

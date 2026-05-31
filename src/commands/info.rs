@@ -23,7 +23,20 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     let file_name = m.path.file_name().unwrap().to_string_lossy();
     let desc = m.manifest.module.description.as_deref().unwrap_or("—");
-    let deps = if m.manifest.module.deps.is_empty() { "—".to_string() } else { m.manifest.module.deps.join(", ") };
+    
+    let deps = if m.manifest.module.deps.is_empty() {
+        "—".to_string()
+    } else {
+        m.manifest.module.deps.iter()
+            .map(|d| match &d.version {
+                Some(v) => format!("{}@{}", d.name, v),
+                None => d.name.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }; 
+
+    
     let tags = if m.manifest.module.tags.is_empty() { "—".to_string() } else { m.manifest.module.tags.join(", ") };
 
     let kw = |s: &str| format!("{:<14}", s).bold().cyan();
