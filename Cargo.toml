@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "*"
-clap = { version = "*", features = ["derive"] }
+clap = { version = "*", features = ["derive", "env"] }
 serde = { version = "*", features = ["derive"] }
 toml = "*"
 colored = "*"
