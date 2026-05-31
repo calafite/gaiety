@@ -1,0 +1,11 @@
+[package]
+name = "zrt-loader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "*"
+clap = { version = "*", features = ["derive"] }
+serde = { version = "*", features = ["derive"] }
+toml = "*"
+colored = "*"
