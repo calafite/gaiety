@@ -34,6 +34,7 @@ pub fn run(dirs: String) -> Result<()> {
 
         let version = format!("v{}", m.manifest.module.version);
         let desc = m.manifest.module.description.as_deref().unwrap_or("—");
+
         input.push_str(&format!(
             "{:<18}  {}  \x1b[2m{:<10}\x1b[0m  \x1b[2m{}\x1b[0m\n",
             m.manifest.module.name, status_colored, version, desc,
@@ -49,7 +50,7 @@ pub fn run(dirs: String) -> Result<()> {
             "--border=none",
             "--info=inline",
             "--header=  \x1b[1menter\x1b[0m: reload module   \x1b[1mesc\x1b[0m: quit",
-            "--preview=gaiety info {1}",
+            "--preview=CLICOLOR_FORCE=1 gaiety info {1}",
             "--preview-window=right:60%:wrap:border-left",
             "--color=border:#555555,header:#888888,hl:#00d7af,hl+:#00d7af",
         ])
@@ -68,8 +69,7 @@ pub fn run(dirs: String) -> Result<()> {
     let key = lines.next().unwrap_or("");
 
     if key == "enter" {
-        let selected = lines.next().unwrap_or("").trim();
-        // Extract the module name — always the first whitespace-separated token.
+        let selected = lines.next().unwrap_or("").trim(); 
         if let Some(name) = selected.split_whitespace().next() {
             println!("{}", name);
         }
