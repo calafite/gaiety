@@ -59,4 +59,9 @@ pub enum Commands {
 pub fn execute(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init => init::run(cli.dir),
-        Commands::Li
+        Commands::List => list::run(cli.dir),
+        Commands::Info { module } => info::run(cli.dir, module),
+        Commands::New { module } => new::run(cli.dir, module),
+        Commands::Rm { module } => rm::run(cli.dir, module),
+    }
+}
