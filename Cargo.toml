@@ -9,6 +9,7 @@ clap = { version = "*", features = ["derive", "env"] }
 serde = { version = "*", features = ["derive"] }
 toml = "*"
 colored = "*"
+shellexpand = "*"
 
 [[bin]]
 name = "gaiety"
