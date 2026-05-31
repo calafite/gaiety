@@ -16,5 +16,5 @@ pub enum ModuleStatus {
     SkippedMissingCmd(String),
     SkippedMissingAnyCmd(Vec<String>),
     SkippedMissingDep(String),
+    SkippedBadConstraint(String),
 }
-

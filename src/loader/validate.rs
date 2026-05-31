@@ -51,12 +51,23 @@ impl Loader {
                         }
                         Some(version) => {
                             if let Some(constraint) = &dep.version {
-                                if !satisfies(version, constraint) {
-                                    m.status = ModuleStatus::SkippedMissingDep(
-                                        format!("{}@{}", dep.name, constraint)
-                                    );
-                                    changed = true;
-                                    break;
+                                match satisfies(version, constraint) {
+                                    Ok(true) => {}
+                                    Ok(false) => {
+                                        m.status = ModuleStatus::SkippedMissingDep(
+                                            format!("{}@{}", dep.name, constraint),
+                                        );
+                                        changed = true;
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        m.status = ModuleStatus::SkippedBadConstraint(format!(
+                                            "dep '{}': {}",
+                                            dep.name, e
+                                        ));
+                                        changed = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -65,7 +76,7 @@ impl Loader {
             }
         }
     }
- 
+
     pub fn check_completions(&self, modules: &[DiscoveredModule]) -> Vec<String> {
         let all_content: String = modules
             .iter()
@@ -110,23 +121,69 @@ impl Loader {
     }
 }
 
-fn satisfies(version: &str, constraint: &str) -> bool {
-    if let Some(required) = constraint.strip_prefix(">=") {
-        compare_versions(version, required.trim()) >= 0
-    } else if let Some(required) = constraint.strip_prefix('=') {
-        compare_versions(version, required.trim()) == 0
-    } else {
-        true
+fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
+    let version = parse_version(version)
+        .ok_or_else(|| format!("invalid version string '{}'", version))?;
+
+    // Two-character operators must be checked before their one-character prefixes.
+    if let Some(req) = constraint.strip_prefix(">=") {
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) >= 0);
     }
+    if let Some(req) = constraint.strip_prefix("<=") {
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) <= 0);
+    }
+    if let Some(req) = constraint.strip_prefix('>') {
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) > 0);
+    }
+    if let Some(req) = constraint.strip_prefix('<') {
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) < 0);
+    }
+    if let Some(req) = constraint.strip_prefix('=') {
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) == 0);
+    }
+    if let Some(req) = constraint.strip_prefix('~') { 
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(
+            cmp_version(&version, &req) >= 0
+                && version.get(0) == req.get(0)
+                && version.get(1) == req.get(1),
+        );
+    }
+    if let Some(req) = constraint.strip_prefix('^') { 
+        let req = parse_version(req.trim())
+            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
+        return Ok(cmp_version(&version, &req) >= 0 && version.get(0) == req.get(0));
+    }
+
+    Err(format!(
+        "unrecognised constraint '{}' (expected one of: =, >=, >, <=, <, ~, ^)",
+        constraint
+    ))
 }
 
-fn compare_versions(a: &str, b: &str) -> i32 {
-    let a_parts: Vec<u64> = a.split('.').filter_map(|s| s.parse().ok()).collect();
-    let b_parts: Vec<u64> = b.split('.').filter_map(|s| s.parse().ok()).collect();
-    let len = a_parts.len().max(b_parts.len());
+fn parse_version(s: &str) -> Option<Vec<u64>> {
+    if s.is_empty() {
+        return None;
+    }
+    s.split('.').map(|part| part.parse::<u64>().ok()).collect()
+}
+
+fn cmp_version(a: &[u64], b: &[u64]) -> i64 {
+    let len = a.len().max(b.len());
     for i in 0..len {
-        let av = a_parts.get(i).copied().unwrap_or(0);
-        let bv = b_parts.get(i).copied().unwrap_or(0);
+        let av = a.get(i).copied().unwrap_or(0);
+        let bv = b.get(i).copied().unwrap_or(0);
         if av != bv {
             return if av > bv { 1 } else { -1 };
         }

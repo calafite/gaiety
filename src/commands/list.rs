@@ -18,6 +18,7 @@ pub fn run(dirs: String) -> Result<()> {
             ModuleStatus::SkippedMissingCmd(_)
             | ModuleStatus::SkippedMissingAnyCmd(_)
             | ModuleStatus::SkippedMissingDep(_) => format!("{:<8}", "skipped").yellow(),
+            ModuleStatus::SkippedBadConstraint(_) => format!("{:<8}", "error").red(),
         };
 
         let version_colored = format!("v{:<7}", m.manifest.module.version).dimmed();
@@ -25,13 +26,17 @@ pub fn run(dirs: String) -> Result<()> {
         let deps = if m.manifest.module.deps.is_empty() {
             "[]".to_string()
         } else {
-            format!("[{}]", m.manifest.module.deps.iter()
-            .map(|d| match &d.version {
-                Some(v) => format!("{}@{}", d.name, v),
-                None => d.name.clone(),
-            })
-            .collect::<Vec<_>>()
-            .join(", "))
+            format!(
+                "[{}]",
+                m.manifest.module.deps
+                    .iter()
+                    .map(|d| match &d.version {
+                        Some(v) => format!("{}@{}", d.name, v),
+                        None => d.name.clone(),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         };
 
         let deps_colored = format!("deps:{:<22}", deps).dimmed();
@@ -55,10 +60,13 @@ pub fn run(dirs: String) -> Result<()> {
                 let msg = format!("↳ missing or skipped dependency: {}", dep);
                 println!("    {}", msg.yellow());
             }
+            ModuleStatus::SkippedBadConstraint(detail) => {
+                let msg = format!("↳ bad version constraint: {}", detail);
+                println!("    {}", msg.red());
+            }
             ModuleStatus::Loaded => {}
         }
     }
     println!();
     Ok(())
 }
-

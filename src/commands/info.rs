@@ -14,30 +14,39 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
         None => bail!("Module '{}' not found.", module_name),
     };
 
-    println!("\n{} {}\n", "::".bold().cyan(), format!("Module: {}", m.manifest.module.name).bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        format!("Module: {}", m.manifest.module.name).bold().cyan()
+    );
 
     let status_text = match &m.status {
-    ModuleStatus::Loaded => "loaded".green(),
-    _ => "skipped".yellow(),
+        ModuleStatus::Loaded => "loaded".green(),
+        ModuleStatus::SkippedBadConstraint(_) => "error".red(),
+        _ => "skipped".yellow(),
     };
 
     let file_name = m.path.file_name().unwrap().to_string_lossy();
     let desc = m.manifest.module.description.as_deref().unwrap_or("—");
-    
+
     let deps = if m.manifest.module.deps.is_empty() {
         "—".to_string()
     } else {
-        m.manifest.module.deps.iter()
+        m.manifest.module.deps
+            .iter()
             .map(|d| match &d.version {
                 Some(v) => format!("{}@{}", d.name, v),
                 None => d.name.clone(),
             })
             .collect::<Vec<_>>()
             .join(", ")
-    }; 
+    };
 
-    
-    let tags = if m.manifest.module.tags.is_empty() { "—".to_string() } else { m.manifest.module.tags.join(", ") };
+    let tags = if m.manifest.module.tags.is_empty() {
+        "—".to_string()
+    } else {
+        m.manifest.module.tags.join(", ")
+    };
 
     let kw = |s: &str| format!("{:<14}", s).bold().cyan();
     println!("  {} {}", kw("status"), status_text);
@@ -48,16 +57,34 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     println!("  {} {}", kw("deps"), deps);
     println!("  {} {}", kw("tags"), tags);
 
-    // shows skip reason also
     match &m.status {
         ModuleStatus::SkippedMissingCmd(cmd) => {
-            println!("  {} missing required command: {}", kw("skip reason"), cmd.yellow());
+            println!(
+                "  {} missing required command: {}",
+                kw("skip reason"),
+                cmd.yellow()
+            );
         }
         ModuleStatus::SkippedMissingAnyCmd(cmds) => {
-            println!("  {} none of these commands found: {}", kw("skip reason"), cmds.join(", ").yellow());
+            println!(
+                "  {} none of these commands found: {}",
+                kw("skip reason"),
+                cmds.join(", ").yellow()
+            );
         }
         ModuleStatus::SkippedMissingDep(dep) => {
-            println!("  {} missing or skipped dependency: {}", kw("skip reason"), dep.yellow());
+            println!(
+                "  {} missing or skipped dependency: {}",
+                kw("skip reason"),
+                dep.yellow()
+            );
+        }
+        ModuleStatus::SkippedBadConstraint(detail) => {
+            println!(
+                "  {} bad version constraint: {}",
+                kw("error"),
+                detail.red()
+            );
         }
         ModuleStatus::Loaded => {}
     }
@@ -65,7 +92,8 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     println!();
 
     let api = &m.manifest.api;
-    let has_api = !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
+    let has_api =
+        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
 
     if has_api {
         println!("  {}", "Public API".bold().cyan());
@@ -80,7 +108,12 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
         if !api.aliases.is_empty() {
             println!("    {}", "aliases:".dimmed());
             for (name, target) in &api.aliases {
-                println!("      {:<14} {} {}", name.green(), "→".dimmed(), target.dimmed());
+                println!(
+                    "      {:<14} {} {}",
+                    name.green(),
+                    "→".dimmed(),
+                    target.dimmed()
+                );
             }
         }
 
@@ -91,10 +124,13 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
             }
         }
     } else {
-        println!("  {}  {}", "Public API".bold().cyan(), "(none registered)".dimmed());
+        println!(
+            "  {}  {}",
+            "Public API".bold().cyan(),
+            "(none registered)".dimmed()
+        );
     }
 
     println!();
     Ok(())
 }
-
