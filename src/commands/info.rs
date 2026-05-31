@@ -35,7 +35,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     println!("  {} {}", kw("deps"), deps);
     println!("  {} {}", kw("tags"), tags);
 
-    // Show skip reason when relevant.
+    // shows skip reason also
     match &m.status {
         ModuleStatus::SkippedMissingCmd(cmd) => {
             println!("  {} missing required command: {}", kw("skip reason"), cmd.yellow());
