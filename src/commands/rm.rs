@@ -32,10 +32,32 @@ pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
     if input.trim().eq_ignore_ascii_case("y") {
         fs::remove_dir_all(&m.path)?;
         println!("{} deleted: {}", "✓".bold().green(), m.path.display());
+        renumber_modules(&loader.dir)?;
     } else {
         println!("{} aborted", "!".bold().yellow());
     }
 
     println!();
+    Ok(())
+}
+
+fn renumber_modules(dir: &PathBuf) -> Result<()> {
+    let mut dirs: Vec<_> = fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_dir() && p.join("module.toml").exists())
+        .collect();
+
+    dirs.sort();
+
+    for (i, path) in dirs.iter().enumerate() {
+        let dir_name = path.file_name().unwrap().to_string_lossy();
+        let suffix = dir_name.splitn(2, '_').nth(1).unwrap_or(&dir_name);
+        let new_name = format!("{:02}_{}", i + 1, suffix);
+        if dir_name != new_name {
+            fs::rename(path, dir.join(&new_name))?;
+            println!("{} renamed: {} → {}", "↻".bold().blue(), dir_name, new_name);
+        }
+    }
     Ok(())
 }
