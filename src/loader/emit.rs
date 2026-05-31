@@ -49,7 +49,7 @@ impl Loader {
 
     fn generate_reset_fn(&self, modules: &[DiscoveredModule]) -> String {
         let mut out = String::new();
-        out.push_str("_zrt_reset() {\n");
+        out.push_str("_ga_reset() {\n");
 
         let mut all_funcs = Vec::new();
         let mut all_vars = Vec::new();

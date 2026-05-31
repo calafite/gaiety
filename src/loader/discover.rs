@@ -2,6 +2,7 @@ use super::types::{DiscoveredModule, ModuleStatus};
 use super::Loader;
 use crate::manifest::Manifest;
 use anyhow::{Context, Result};
+use colored::Colorize;
 use std::fs;
 
 impl Loader {

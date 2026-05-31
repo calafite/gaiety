@@ -19,7 +19,7 @@ fn styles() -> Styles {
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "zrt-loader",
+    name = "gaiety",
     version,
     about = "Zsh Runtime Module Loader",
     styles = styles()
