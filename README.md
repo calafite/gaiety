@@ -1,75 +1,69 @@
 # gaiety
 
-A minimal Zsh runtime module loader. Write modular shell config, declare dependencies and public API in a manifest, and let gaiety handle load order, validation, and cleanup.
+Minimalist zsh runtime module loader. Write modular shell config, declare dependencies and public APIs in manifests. Gaiety handles load order, validation and cleanup.
 
 ---
 
-## Installation
-
 ### Shell setup
 
-Add to your `.zshrc`:
+In `.zshrc`:
 
 ```zsh
 export GAI_DIRS="/usr/share/gaiety/modules:~/.config/gaiety/modules"
 eval "$(gai init)"
 ```
 
-`GAI_DIRS` is colon-separated. Directories are loaded left to right. Put system-wide modules first, personal ones last. The last directory is used as the default target for `gai new` and `gai rm`.
+`GAI_DIRS` is colon-separated. Directories load left to right ~ put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
 
 ---
 
 ## Module structure
 
-Each module is a directory containing two files:
+Each module is a directory with two files:
 
 ```
 ~/.config/gaiety/modules/
-  01_core/
+  01_list/
     module.toml
     init.zsh
-  02_list/
+  02_comp/
     module.toml
     init.zsh
 ```
 
-The numeric prefix controls load order. Gaps are fine, as gaiety renumbers automatically when you remove a module.
+The numeric prefix controls load order. Gaps are fine ~ gaiety renumbers automatically on removal.
 
 ### module.toml
 
 ```toml
 [module]
 name        = "list"
-description = "Directory listing with eza/exa"
+description = "directory listing with eza/exa"
 version     = "1.0.0"
-deps        = ["core"]
+deps        = []
+# deps = [{ name = "other_module", version = ">=1.0.0" }]
 tags        = []
 
-# Skip this module if none of these commands exist
+# skip if any of these binaries are unavailable
 requires_cmd     = []
 
-# Skip this module if none of these commands exist (OR logic)
+# skip if none of these binaries are available
 requires_any_cmd = ["eza", "exa"]
 
 [api]
-# Functions this module exposes (unloaded on reload)
+# functions this module exposes ~ unloaded on reload
 functions  = ["ls", "ll", "la", "lt", "lta", "help_ls"]
 
-# Variables this module sets (unset on reload)
+# variables this module sets ~ unset on reload
 variables  = []
 
-# Shell aliases (registered and unregistered automatically)
 # aliases = { top = "btop" }
-
-# Completion bindings: { "command" = "_completion_fn" }
 # completions = { "lt" = "_rt_comp_dirs" }
 ```
 
 ### init.zsh
 
-Plain zsh. No magic — just source a file. The manifest declares what it exposes; the script implements it.
-
-Convention: prefix internal functions with `_modulename_` to avoid collisions.
+Plain zsh. The manifest declares what it exposes, the script implements it. Prefix internal functions with `_modulename_` to avoid collisions.
 
 ```zsh
 _list_ls() { eza --icons --group-directories-first "$@"; }
@@ -83,11 +77,12 @@ ll() { eza -lh --icons --group-directories-first "$@"; }
 ## Commands
 
 ```
-gai init          Emit the Zsh initialization script (used in .zshrc)
-gai list          List all modules and their status
-gai info <name>   Show metadata and public API for a module
-gai new <name>    Scaffold a new module from templates
-gai rm <name>     Remove a module and renumber remaining
+gai init                    emit the zsh initialization script
+gai list                    list all modules and their status
+gai info <name>             show metadata and public api for a module
+gai new <name>              scaffold a new module from templates
+gai rename <old> <new>      rename a module and update all dependents
+gai rm <name>               remove a module and renumber remaining
 ```
 
 ### gai list
@@ -95,15 +90,14 @@ gai rm <name>     Remove a module and renumber remaining
 ```
 :: Module Registry
 
-  core            loaded    v1.0.0   deps:[]
-  list            loaded    v1.0.0   deps:[core]
-  zoxide          skipped   v1.0.0   deps:[core]
+  list            loaded    v1.0.0   deps:[]
+  zoxide          skipped   v1.0.0   deps:[]
     ↳ none of these commands found: zoxide
 ```
 
 ### gai new
 
-Creates a numbered directory with `module.toml` and `init.zsh` scaffolded from templates. The prefix is assigned automatically based on existing modules.
+Creates a numbered directory with `module.toml` and `init.zsh` from templates. Prefix is assigned automatically.
 
 ```zsh
 gai new mything
@@ -111,32 +105,46 @@ gai new mything
 #          03_mything/init.zsh
 ```
 
-Use `--target` to write to a specific directory instead of the default:
+Use `--target` to write to a specific directory:
 
 ```zsh
 gai new mything --target /usr/share/gaiety/modules
 ```
 
+### gai rename
+
+Renames the module directory, updates its `module.toml`, and rewrites any `deps` references across all modules.
+
+```zsh
+gai rename oldname newname
+```
+
 ### gai rm
 
-Prompts for confirmation, deletes the module directory, and renumbers remaining modules.
+Prompts for confirmation, deletes the directory, and renumbers remaining modules.
 
 ```zsh
 gai rm mything
-# ? Remove module 'mything'? [y/N]
+# ? remove module 'mything'? [y/N]
 ```
 
 ---
 
 ## Module status
 
-A module can be skipped at load time if:
+A module is skipped if:
 
-- `requires_cmd` — one of the listed commands is not in `PATH`
-- `requires_any_cmd` — none of the listed commands are in `PATH`
-- `deps` — a declared dependency was not loaded (cascades)
+- `requires_cmd` ~ one of the listed commands is missing from `PATH`
+- `requires_any_cmd` ~ none of the listed commands are in `PATH`
+- `deps` ~ a dependency was not loaded (cascades)
 
-Skipped modules are visible in `gai list` with a reason. Their `init.zsh` is not sourced and their API is not registered.
+Skipped modules show up in `gai list` with a reason. Their `init.zsh` is not sourced and their API is not registered.
+
+---
+
+## Multiple directories
+
+Modules across all `GAI_DIRS` are treated as a single unified registry ~ unique names, unique prefixes, shared dependency graph. If the same module name exists in multiple directories, the last directory wins.
 
 ---
 
@@ -146,28 +154,24 @@ Skipped modules are visible in `gai list` with a reason. Their `init.zsh` is not
 gai reload
 ```
 
-Calls `_gai_reset` (unsets all registered functions, variables, and aliases), then re-evals `gai init`. Defined in the wrapper sourced by `eval "$(gai init)"`.
+Calls `_gai_reset` (unsets all registered functions, variables and aliases), then re-evals `gai init`.
 
 ---
 
 ## Completions
-
-To bind a completion function to a command, add it to `module.toml`:
 
 ```toml
 [api]
 completions = { "lt" = "_rt_comp_dirs" }
 ```
 
-The function must be defined somewhere in a loaded `init.zsh`. gaiety will warn at load time if it can't find the function.
-
-Common completions:
+The function must exist somewhere in a loaded `init.zsh` ~ gaiety warns at load time if it can't find it.
 
 ```zsh
-# Directories only
+# directories only
 _rt_comp_dirs() { _path_files -/; }
 
-# Files and directories
+# files and directories
 _rt_comp_paths() { _path_files; }
 ```
 
@@ -177,5 +181,5 @@ _rt_comp_paths() { _path_files; }
 
 - Module names must match `[a-zA-Z_][a-zA-Z0-9_]*`
 - Use `requires_any_cmd` for modules with multiple binary options (e.g. `eza`/`exa`)
-- Keep internal functions prefixed — public API is what goes in `functions` in the manifest
-- `gai info <name>` is useful for debugging what a module actually exposes
+- Keep internal functions prefixed ~ public API is what goes in `functions` in the manifest
+- `gai info <name>` is useful for debugging what a module exposes
