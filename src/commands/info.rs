@@ -17,9 +17,9 @@ pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
 
     println!("\n{} {}\n", "::".bold().cyan(), format!("Module: {}", m.manifest.module.name).bold().cyan());
 
-    let (status_color, status_text) = match &m.status {
-        ModuleStatus::Loaded => ("\x1b[32m", "loaded"),
-        _ => ("\x1b[33m", "skipped"),
+    let status_text = match &m.status {
+    ModuleStatus::Loaded => "loaded".green(),
+    _ => "skipped".yellow(),
     };
 
     let file_name = m.path.file_name().unwrap().to_string_lossy();
@@ -28,7 +28,7 @@ pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
     let tags = if m.manifest.module.tags.is_empty() { "—".to_string() } else { m.manifest.module.tags.join(", ") };
 
     let kw = |s: &str| format!("{:<14}", s).bold().cyan();
-    println!("  {} {}{}\x1b[0m", kw("status"), status_color, status_text);
+    println!("  {} {}", kw("status"), status_text);
     println!("  {} {}", kw("file"), file_name.dimmed());
     println!("  {} {}", kw("path"), m.path.display().to_string().dimmed());
     println!("  {} {}", kw("desc"), desc);
