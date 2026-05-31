@@ -13,7 +13,7 @@ export GAI_DIRS="/usr/share/gaiety/modules:~/.config/gaiety/modules"
 eval "$(gai init)"
 ```
 
-`GAI_DIRS` is colon-separated. Directories load left to right ~ put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
+`GAI_DIRS` is colon-separated. Directories load left to right. Put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
 
 ---
 
@@ -31,7 +31,7 @@ Each module is a directory with two files:
     init.zsh
 ```
 
-The numeric prefix controls load order. Gaps are fine ~ gaiety renumbers automatically on removal.
+The numeric prefix controls load order. Gaps are fine, as gaiety renumbers automatically on removal.
 
 ### module.toml
 
@@ -144,7 +144,7 @@ Skipped modules show up in `gai list` with a reason. Their `init.zsh` is not sou
 
 ## Multiple directories
 
-Modules across all `GAI_DIRS` are treated as a single unified registry ~ unique names, unique prefixes, shared dependency graph. If the same module name exists in multiple directories, the last directory wins.
+Modules across all `GAI_DIRS` are treated as a single unified registry: nique names, unique prefixes, shared dependency graph. If the same module name exists in multiple directories, the last directory wins.
 
 ---
 
@@ -165,7 +165,7 @@ Calls `_gai_reset` (unsets all registered functions, variables and aliases), the
 completions = { "lt" = "_rt_comp_dirs" }
 ```
 
-The function must exist somewhere in a loaded `init.zsh` ~ gaiety warns at load time if it can't find it.
+The function must exist somewhere in a loaded `init.zsh`, gaiety warns at load time if it can't find it.
 
 ```zsh
 # directories only
@@ -176,10 +176,3 @@ _rt_comp_paths() { _path_files; }
 ```
 
 ---
-
-## Tips
-
-- Module names must match `[a-zA-Z_][a-zA-Z0-9_]*`
-- Use `requires_any_cmd` for modules with multiple binary options (e.g. `eza`/`exa`)
-- Keep internal functions prefixed ~ public API is what goes in `functions` in the manifest
-- `gai info <name>` is useful for debugging what a module exposes
