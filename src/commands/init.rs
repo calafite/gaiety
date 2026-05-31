@@ -1,6 +1,5 @@
 use crate::loader::Loader;
 use anyhow::Result;
-use std::path::PathBuf;
 
 pub fn run(dirs: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;

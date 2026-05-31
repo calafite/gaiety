@@ -2,7 +2,6 @@ use crate::loader::types::ModuleStatus;
 use crate::loader::Loader;
 use anyhow::{bail, Result};
 use colored::Colorize;
-use std::path::PathBuf;
 
 pub fn run(dirs: String, module_name: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
