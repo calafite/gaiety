@@ -5,17 +5,13 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
-    if module_name == "core" {
-        bail!("Cannot remove 'core' — it is usually required by the runtime.");
-    }
-
-    let loader = Loader::new(dir);
+pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result<()> {
+    let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    let target = modules.iter().find(|m| m.manifest.module.name == module_name);
+    let target_module = modules.iter().find(|m| m.manifest.module.name == module_name);
 
-    let m = match target {
+    let m = match target_module {
         Some(m) => m,
         None => bail!("Module '{}' not found.", module_name),
     };
@@ -30,9 +26,11 @@ pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
     io::stdin().read_line(&mut input)?;
 
     if input.trim().eq_ignore_ascii_case("y") {
+        let module_parent = m.path.parent().unwrap().to_path_buf();
         fs::remove_dir_all(&m.path)?;
         println!("{} deleted: {}", "✓".bold().green(), m.path.display());
-        renumber_modules(&loader.dir)?;
+        let write_dir = target.unwrap_or(module_parent);
+        renumber_modules(&write_dir)?;
     } else {
         println!("{} aborted", "!".bold().yellow());
     }
@@ -59,5 +57,6 @@ fn renumber_modules(dir: &PathBuf) -> Result<()> {
             println!("{} renamed: {} → {}", "↻".bold().blue(), dir_name, new_name);
         }
     }
+
     Ok(())
 }

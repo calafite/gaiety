@@ -8,34 +8,29 @@ use std::fs;
 impl Loader {
     pub(crate) fn discover_modules(&self) -> Result<Vec<DiscoveredModule>> {
         let mut modules = Vec::new();
-        if !self.dir.exists() {
-            eprintln!(
-                "{} modules directory does not exist: {}",
-                "warn:".bold().yellow(),
-                self.dir.display()
-                );
-            return Ok(modules);
-        }
-        for entry in fs::read_dir(&self.dir).context("Failed to read modules directory")? {
-            let entry = entry?;
-            let path = entry.path();
 
-            if path.is_dir() {
-                let toml_path = path.join("module.toml");
-                if toml_path.exists() {
-                    let content = fs::read_to_string(&toml_path)?;
-                    let manifest: Manifest = toml::from_str(&content)
-                        .with_context(|| format!("Failed to parse manifest: {}", toml_path.display()))?;
+        for dir in &self.dirs {
+            for entry in fs::read_dir(dir).with_context(|| format!("Failed to read directory: {}", dir.display()))? {
+                let entry = entry?;
+                let path = entry.path();
 
-                    let dir_name = path.file_name().unwrap().to_string_lossy();
-                    let prefix_order = dir_name.split('_').next().and_then(|s| s.parse::<u32>().ok());
+                if path.is_dir() {
+                    let toml_path = path.join("module.toml");
+                    if toml_path.exists() {
+                        let content = fs::read_to_string(&toml_path)?;
+                        let manifest: Manifest = toml::from_str(&content)
+                            .with_context(|| format!("Failed to parse manifest: {}", toml_path.display()))?;
 
-                    modules.push(DiscoveredModule {
-                        path,
-                        manifest,
-                        prefix_order,
-                        status: ModuleStatus::Loaded,
-                    });
+                        let dir_name = path.file_name().unwrap().to_string_lossy();
+                        let prefix_order = dir_name.split('_').next().and_then(|s| s.parse::<u32>().ok());
+
+                        modules.push(DiscoveredModule {
+                            path,
+                            manifest,
+                            prefix_order,
+                            status: ModuleStatus::Loaded,
+                        });
+                    }
                 }
             }
         }

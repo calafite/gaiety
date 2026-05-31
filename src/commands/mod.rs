@@ -25,9 +25,9 @@ fn styles() -> Styles {
     styles = styles()
 )]
 pub struct Cli {
-    /// Directory containing the modules
-    #[arg(short, long, global = true, env = "GAI_DIR", default_value = ".")]
-    pub dir: PathBuf,
+    /// Colon-separated list of module directories
+    #[arg(short, long, global = true, env = "GAI_DIRS", default_value = ".")]
+    pub dirs: String,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -48,11 +48,17 @@ pub enum Commands {
     New {
         /// Name of the new module
         module: String,
+        /// Directory to create the module in (defaults to the last in GAI_DIRS)
+        #[arg(short, long)]
+        target: Option<PathBuf>,
     },
     /// Remove a module and its directory
     Rm {
-        /// Name of the module to remove
-        module: String,
+    /// Name of the module to remove
+    module: String,
+    /// Directory to remove the module from (defaults to last in GAI_DIRS)
+    #[arg(short, long)]
+    target: Option<PathBuf>,
     },
 }
 
