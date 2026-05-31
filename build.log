@@ -1,0 +1,63 @@
+   Compiling gaiety v0.2.0 (/home/walt/repos/gaiety)
+warning: unused import: `std::path::PathBuf`
+ --> src/commands/rename.rs:5:5
+  |
+5 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0277]: can't compare `Dep` with `Dep`
+  --> src/commands/rename.rs:42:35
+   |
+42 |         if m.manifest.module.deps.contains(&old_name) {
+   |                                   ^^^^^^^^ no implementation for `Dep == Dep`
+   |
+   = help: the trait `PartialEq` is not implemented for `Dep`
+note: required by a bound in `core::slice::<impl [T]>::contains`
+  --> /rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/slice/mod.rs:2583:5
+help: consider annotating `Dep` with `#[derive(PartialEq)]`
+  --> src/manifest.rs:27:1
+   |
+27 + #[derive(PartialEq)]
+28 | pub struct Dep {
+   |
+
+error[E0308]: mismatched types
+  --> src/commands/rename.rs:42:44
+   |
+42 |         if m.manifest.module.deps.contains(&old_name) {
+   |                                   -------- ^^^^^^^^^ expected `&Dep`, found `&String`
+   |                                   |
+   |                                   arguments to this method are incorrect
+   |
+   = note: expected reference `&Dep`
+              found reference `&std::string::String`
+note: method defined here
+  --> /rustc/ed61e7d7e242494fb7057f2657300d9e77bb4fcb/library/core/src/slice/mod.rs:2583:12
+
+error[E0004]: non-exhaustive patterns: `Commands::Rename { .. }` not covered
+  --> src/commands/mod.rs:74:11
+   |
+74 |     match cli.command {
+   |           ^^^^^^^^^^^ pattern `Commands::Rename { .. }` not covered
+   |
+note: `Commands` defined here
+  --> src/commands/mod.rs:38:10
+   |
+38 | pub enum Commands {
+   |          ^^^^^^^^
+...
+65 |     Rename {
+   |     ------ not covered
+   = note: the matched value is of type `Commands`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+79 ~         Commands::Rm { module, target } => rm::run(cli.dirs, module, target),
+80 ~         Commands::Rename { .. } => todo!(),
+   |
+
+Some errors have detailed explanations: E0004, E0277, E0308.
+For more information about an error, try `rustc --explain E0004`.
+warning: `gaiety` (bin "gaiety") generated 1 warning
+error: could not compile `gaiety` (bin "gaiety") due to 3 previous errors; 1 warning emitted

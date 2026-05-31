@@ -77,5 +77,6 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::Info { module } => info::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm { module, target } => rm::run(cli.dirs, module, target),
+        Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
     }
 }

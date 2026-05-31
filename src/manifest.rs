@@ -23,7 +23,7 @@ pub struct ModuleMeta {
     pub requires_any_cmd: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Dep {
     pub name: String,
     pub version: Option<String>,
