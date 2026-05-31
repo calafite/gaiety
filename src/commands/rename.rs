@@ -32,8 +32,8 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         .with_context(|| format!("Failed to read {}", own_toml_path.display()))?;
     let own_updated = set_module_name(&own_content, &new_name)
         .with_context(|| format!("Failed to rewrite {}", own_toml_path.display()))?;
- 
-    let mut dependent_rewrites: Vec<(std::path::PathBuf, String, String)> = Vec::new();
+
+    let mut dependent_rewrites: Vec<(String, std::path::PathBuf, String, String)> = Vec::new();
     for dep_module in &modules {
         if dep_module.manifest.module.name == old_name {
             continue;
@@ -44,7 +44,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
                 .with_context(|| format!("Failed to read {}", path.display()))?;
             let updated = rename_dep(&content, &old_name, &new_name)
                 .with_context(|| format!("Failed to rewrite dep in {}", path.display()))?;
-            dependent_rewrites.push((path, content, updated));
+            dependent_rewrites.push((dep_module.manifest.module.name.clone(), path, content, updated));
         }
     }
 
@@ -55,20 +55,30 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         );
     }
 
+    println!("\n{} {}\n", "::".bold().cyan(), "Rename Module".bold().cyan());
+    println!("  {:<10} {} {} {}", "name:".dimmed(), old_name.green(), "→".dimmed(), new_name.green());
+    println!("  {:<10} {} {} {}", "dir:".dimmed(), dir_name.to_string().dimmed(), "→".dimmed(), new_dir_name.dimmed());
+    if !dependent_rewrites.is_empty() {
+        let dep_names = dependent_rewrites
+            .iter()
+            .map(|(name, _, _, _)| name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("  {:<10} {}", "deps:".dimmed(), dep_names.dimmed());
+    }
+    println!();
+
     copy_dir(old_dir, &new_dir)
         .with_context(|| format!("Failed to copy {} → {}", old_dir.display(), new_dir.display()))?;
-    println!("{} copied dir: {} → {}", "↻".bold().blue(), dir_name, new_dir_name);
 
     let write_result = (|| -> Result<()> {
         let new_toml_path = new_dir.join("module.toml");
         fs::write(&new_toml_path, own_updated)
             .with_context(|| format!("Failed to write {}", new_toml_path.display()))?;
-        println!("{} updated: {}", "↻".bold().blue(), new_toml_path.display());
 
-        for (path, _original, updated) in dependent_rewrites {
-            fs::write(&path, &updated)
+        for (_, path, _original, updated) in &dependent_rewrites {
+            fs::write(path, updated)
                 .with_context(|| format!("Failed to write {}", path.display()))?;
-            println!("{} updated dep in: {}", "↻".bold().blue(), path.display());
         }
         Ok(())
     })();
@@ -80,9 +90,8 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
 
     fs::remove_dir_all(old_dir)
         .with_context(|| format!("Failed to remove original dir: {}", old_dir.display()))?;
-    println!("{} removed original: {}", "↻".bold().blue(), dir_name);
 
-    println!("\n{} renamed '{}' → '{}'\n", "✓".bold().green(), old_name, new_name);
+    println!("{} renamed '{}' → '{}'\n", "✓".bold().green(), old_name, new_name);
     Ok(())
 }
 

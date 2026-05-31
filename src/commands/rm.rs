@@ -31,12 +31,9 @@ pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Re
         },
     };
 
-    println!(
-        "\n{} {}\n",
-        "::".bold().cyan(),
-        format!("Remove Module: {}", module_name).bold().cyan()
-    );
-    println!("  {} {}\n", "path:".dimmed(), m.path.display());
+    println!("\n{} {}\n", "::".bold().cyan(), "Remove Module".bold().cyan());
+    println!("  {:<10} {}", "name:".dimmed(), module_name.green());
+    println!("  {:<10} {}\n", "path:".dimmed(), m.path.display().to_string().dimmed());
 
     print!(
         "{} Remove module '{}'? [y/N] ",
@@ -48,16 +45,15 @@ pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Re
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
 
-    if input.trim().eq_ignore_ascii_case("y") { 
+    if input.trim().eq_ignore_ascii_case("y") {
         let module_dir = m.path.parent().unwrap().to_path_buf();
         fs::remove_dir_all(&m.path)?;
-        println!("{} deleted: {}", "✓".bold().green(), m.path.display());
         renumber_modules(&module_dir)?;
+        println!("{} removed\n", "✓".bold().green());
     } else {
-        println!("{} aborted", "!".bold().yellow());
+        println!("{} aborted\n", "!".bold().yellow());
     }
 
-    println!();
     Ok(())
 }
 
@@ -76,12 +72,6 @@ fn renumber_modules(dir: &PathBuf) -> Result<()> {
         let new_name = format!("{:02}_{}", i + 1, suffix);
         if dir_name != new_name {
             fs::rename(path, dir.join(&new_name))?;
-            println!(
-                "{} renumbered: {} → {}",
-                "↻".bold().blue(),
-                dir_name,
-                new_name
-            );
         }
     }
 

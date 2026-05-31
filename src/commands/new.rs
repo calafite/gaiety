@@ -51,7 +51,7 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
     let zsh_content = ZSH_TEMPLATE.replace("{{MODULE_NAME}}", &module_name);
     fs::write(target_dir.join("init.zsh"), zsh_content)?;
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Module Created".bold().cyan());
+    println!("\n{} {}\n", "::".bold().cyan(), "New Module".bold().cyan());
     println!("  {:<10} {}", "name:".dimmed(), module_name.green());
     println!("  {:<10} {}", "dir:".dimmed(), target_dir_name.green());
     println!("  {:<10} {}", "path:".dimmed(), target_dir.display().to_string().dimmed());
