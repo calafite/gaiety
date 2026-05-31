@@ -20,7 +20,7 @@ impl Loader {
             if m.status == ModuleStatus::Loaded {
                 let init_script = m.path.join("init.zsh");
                 if init_script.exists() {
-                    out.push_str(&format!("source {:?}\n", init_script.display()));
+                    out.push_str(&format!("source {}\n", init_script.display()));
                 }
 
                 if !m.manifest.api.aliases.is_empty() {
