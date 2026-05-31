@@ -24,7 +24,8 @@ impl Loader {
                 let toml_path = path.join("module.toml");
                 if toml_path.exists() {
                     let content = fs::read_to_string(&toml_path)?;
-                    let manifest: Manifest = toml::from_str(&content)?;
+                    let manifest: Manifest = toml::from_str(&content)
+                        .with_context(|| format!("Failed to parse manifest: {}", toml_path.display()))?;
 
                     let dir_name = path.file_name().unwrap().to_string_lossy();
                     let prefix_order = dir_name.split('_').next().and_then(|s| s.parse::<u32>().ok());
