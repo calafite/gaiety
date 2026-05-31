@@ -32,7 +32,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         .with_context(|| format!("Failed to read {}", own_toml_path.display()))?;
     let own_updated = set_module_name(&own_content, &new_name)
         .with_context(|| format!("Failed to rewrite {}", own_toml_path.display()))?;
-
+ 
     let mut dependent_rewrites: Vec<(std::path::PathBuf, String, String)> = Vec::new();
     for dep_module in &modules {
         if dep_module.manifest.module.name == old_name {
@@ -112,6 +112,39 @@ fn set_module_name(content: &str, new_name: &str) -> Result<String> {
         .context("Failed to parse TOML")?;
 
     doc["module"]["name"] = toml_edit::value(new_name);
+
+    Ok(doc.to_string())
+}
+
+fn rename_dep(content: &str, old_name: &str, new_name: &str) -> Result<String> {
+    let mut doc = content
+        .parse::<DocumentMut>()
+        .context("Failed to parse TOML")?;
+
+    if let Some(deps) = doc
+        .get_mut("module")
+        .and_then(|m| m.get_mut("deps"))
+        .and_then(|d| d.as_array_of_tables_mut())
+    {
+        for dep in deps.iter_mut() {
+            if dep.get("name").and_then(|v| v.as_str()) == Some(old_name) {
+                dep["name"] = toml_edit::value(new_name);
+            }
+        }
+    } else if let Some(deps) = doc
+        .get_mut("module")
+        .and_then(|m| m.get_mut("deps"))
+        .and_then(|d| d.as_array_mut())
+    {
+        // Inline array form: deps = [{ name = "foo", version = ">=1.0.0" }]
+        for dep in deps.iter_mut() {
+            if let Some(tbl) = dep.as_inline_table_mut() {
+                if tbl.get("name").and_then(|v| v.as_str()) == Some(old_name) {
+                    tbl.insert("name", toml_edit::Value::from(new_name));
+                }
+            }
+        }
+    }
 
     Ok(doc.to_string())
 }
