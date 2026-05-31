@@ -2,10 +2,8 @@ gai() {
     case "$1" in
         reload)
             if [[ -n "$2" ]]; then
-                local path
-                path=$(gaiety path "$2") || return 1
                 echo "\033[1m\033[34m=> \033[0m\033[2m[gai] reloading module $2...\033[0m"
-                source "$path"
+                source "$3"
                 echo "\033[1m\033[32m✓ \033[0mreloaded $2"
             else
                 echo "\033[1m\033[34m=> \033[0m\033[2m[gai] running reset and reloading modules...\033[0m"
@@ -15,9 +13,12 @@ gai() {
             fi
             ;;
         browse)
-            local name
-            name=$(gaiety browse)
-            [[ -n "$name" ]] && gai reload "$name"
+            local out name path
+            out=$(gaiety browse)
+            [[ -z "$out" ]] && return 0
+            name="${out%%$'\t'*}"
+            path="${out##*$'\t'}"
+            gai reload "$name" "$path"
             ;;
         list|info|new|rm|rename)
             gaiety "$@"

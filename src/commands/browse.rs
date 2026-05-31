@@ -69,9 +69,14 @@ pub fn run(dirs: String) -> Result<()> {
     let key = lines.next().unwrap_or("");
 
     if key == "enter" {
-        let selected = lines.next().unwrap_or("").trim(); 
+        let selected = lines.next().unwrap_or("").trim();
         if let Some(name) = selected.split_whitespace().next() {
-            println!("{}", name);
+            if let Some(m) = modules.iter().find(|m| m.manifest.module.name == name) {
+                let init_path = m.path.join("init.zsh");
+                if init_path.exists() {
+                    println!("{}\t{}", name, init_path.display());
+                }
+            }
         }
     }
 
