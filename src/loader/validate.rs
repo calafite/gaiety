@@ -2,6 +2,7 @@ use super::types::{DiscoveredModule, ModuleStatus};
 use super::Loader;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use colored::Colorize;
 
 impl Loader {
     pub(crate) fn validate_commands(&self, modules: &mut [DiscoveredModule]) {
@@ -32,12 +33,12 @@ impl Loader {
         while changed {
             changed = false;
             
-            let loaded_names: std::collections::HashSet<&str> = modules
+            let loaded_names: std::collections::HashSet<String> = modules
                 .iter()
                 .filter(|m| m.status == ModuleStatus::Loaded)
-                .map(|m| m.manifest.module.name.as_str())
+                .map(|m| m.manifest.module.name.clone())
                 .collect();
-
+            
             for m in modules.iter_mut() {
                 if m.status == ModuleStatus::Loaded {
                     for dep in &m.manifest.module.deps {

@@ -4,8 +4,8 @@ use anyhow::{bail, Result};
 use colored::Colorize;
 use std::path::PathBuf;
 
-pub fn run(dir: PathBuf, module_name: String) -> Result<()> {
-    let loader = Loader::new(dir);
+pub fn run(dirs: String, module_name: String) -> Result<()> {
+    let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
     let target = modules.iter().find(|m| m.manifest.module.name == module_name);

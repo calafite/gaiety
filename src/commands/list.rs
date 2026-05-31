@@ -4,8 +4,8 @@ use anyhow::Result;
 use colored::Colorize;
 use std::path::PathBuf;
 
-pub fn run(dir: PathBuf) -> Result<()> {
-    let loader = Loader::new(dir);
+pub fn run(dirs: String) -> Result<()> {
+    let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
     println!("\n{} {}\n", "::".bold().cyan(), "Module Registry".bold().cyan());

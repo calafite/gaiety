@@ -63,11 +63,13 @@ pub enum Commands {
 }
 
 pub fn execute(cli: Cli) -> Result<()> {
+    pub fn execute(cli: Cli) -> Result<()> {
     match cli.command {
-        Commands::Init => init::run(cli.dir),
-        Commands::List => list::run(cli.dir),
-        Commands::Info { module } => info::run(cli.dir, module),
-        Commands::New { module } => new::run(cli.dir, module),
-        Commands::Rm { module } => rm::run(cli.dir, module),
+        Commands::Init => init::run(cli.dirs),
+        Commands::List => list::run(cli.dirs),
+        Commands::Info { module } => info::run(cli.dirs, module),
+        Commands::New { module, target } => new::run(cli.dirs, module, target),
+        Commands::Rm { module, target } => rm::run(cli.dirs, module, target),
     }
+}
 }
