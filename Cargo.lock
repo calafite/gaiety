@@ -120,6 +120,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
+name = "gaiety"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "colored",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -308,15 +319,4 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df79d97927682d2fd8adb29682d1140b343be4ac0f08fd68b7765d9c059d3945"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "zrt-loader"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "colored",
- "serde",
- "toml",
 ]
