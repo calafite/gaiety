@@ -53,6 +53,33 @@ impl Loader {
         }
     }
 
+    pub(crate) fn validate_completions(&self, modules: &mut [DiscoveredModule]) {
+        let all_content: String = modules
+            .iter()
+            .filter(|m| m.status == ModuleStatus::Loaded)
+            .filter_map(|m| {
+                let init_path = m.path.join("init.zsh");
+                std::fs::read_to_string(init_path).ok()
+            })
+            .collect();
+
+        for m in modules.iter_mut() {
+            if m.status != ModuleStatus::Loaded {
+                continue;
+            }
+            for comp_fn in m.manifest.api.completions.values() {
+                if !all_content.contains(comp_fn.as_str()) {
+                    eprintln!(
+                        "{} module '{}': completion function '{}' not found in any init.zsh",
+                        "warn:".bold().yellow(),
+                        m.manifest.module.name,
+                        comp_fn
+                    );
+                }
+            }
+        }
+    }
+
     fn has_command(&self, cmd: &str) -> bool {
         if let Ok(paths) = std::env::var("PATH") {
             for path in paths.split(':') {
@@ -67,30 +94,5 @@ impl Loader {
             }
         }
         false
-    }
-
-    pub(crate) fn validate_completions(&self, modules: &mut [DiscoveredModule]) {
-        for m in modules.iter_mut() {
-            if m.status != ModuleStatus::Loaded {
-                continue;
-            }
-            let init_path = m.path.join("init.zsh");
-            if !init_path.exists() {
-                continue;
-            }
-            let Ok(content) = std::fs::read_to_string(&init_path) else {
-                continue;
-            };
-            for comp_fn in m.manifest.api.completions.values() {
-                if !content.contains(comp_fn.as_str()) {
-                    eprintln!(
-                        "{} module '{}': completion function '{}' not found in init.zsh",
-                        "warn:".bold().yellow(),
-                        m.manifest.module.name,
-                        comp_fn
-                    );
-                }
-            }
-        }
     }
 }
