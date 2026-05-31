@@ -1,3 +1,4 @@
+pub mod browse;
 pub mod info;
 pub mod init;
 pub mod list;
@@ -38,6 +39,8 @@ pub struct Cli {
 pub enum Commands {
     /// Generate and emit the Zsh initialization script
     Init,
+    /// Browse modules interactively (requires fzf)
+    Browse,
     /// List all modules and their current status
     List,
     /// View detailed metadata and API for a module
@@ -74,6 +77,7 @@ pub enum Commands {
 pub fn execute(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init => init::run(cli.dirs),
+        Commands::Browse => browse::run(cli.dirs),
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
