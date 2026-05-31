@@ -44,14 +44,13 @@ pub fn run(dirs: String) -> Result<()> {
         .args([
             "--ansi",
             "--expect=enter",
+            "--height=100%",
             "--layout=reverse",
-            "--border=rounded",
-            "--height=~80%",
-            "--min-height=12",
+            "--border=none",
             "--info=inline",
             "--header=  \x1b[1menter\x1b[0m: reload module   \x1b[1mesc\x1b[0m: quit",
             "--preview=gaiety info {1}",
-            "--preview-window=right:55%:wrap:border-left",
+            "--preview-window=right:60%:wrap:border-left",
             "--color=border:#555555,header:#888888,hl:#00d7af,hl+:#00d7af",
         ])
         .stdin(Stdio::piped())
@@ -70,12 +69,9 @@ pub fn run(dirs: String) -> Result<()> {
 
     if key == "enter" {
         let selected = lines.next().unwrap_or("").trim();
-        let module_name = selected.split_whitespace().next().unwrap_or("");
-        if let Some(m) = modules.iter().find(|m| m.manifest.module.name == module_name) {
-            let init_path = m.path.join("init.zsh");
-            if init_path.exists() {
-                println!("source:{}:{}", module_name, init_path.display());
-            }
+        // Extract the module name — always the first whitespace-separated token.
+        if let Some(name) = selected.split_whitespace().next() {
+            println!("{}", name);
         }
     }
 

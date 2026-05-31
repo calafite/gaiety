@@ -3,6 +3,7 @@ pub mod info;
 pub mod init;
 pub mod list;
 pub mod new;
+pub mod path;
 pub mod rm;
 pub mod rename;
 
@@ -48,6 +49,11 @@ pub enum Commands {
         /// Name of the module
         module: String,
     },
+    /// Print the path to a module's init.zsh (used internally by gai reload <name>)
+    Path {
+        /// Name of the module
+        module: String,
+    },
     /// Create a new module from templates
     New {
         /// Name of the new module
@@ -80,6 +86,7 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::Browse => browse::run(cli.dirs),
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
+        Commands::Path { module } => path::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm { module, dir } => rm::run(cli.dirs, module, dir),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
