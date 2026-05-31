@@ -9,7 +9,13 @@ gai() {
         browse)
             local out
             out=$(gaiety browse)
-            [[ "$out" == "reload" ]] && gai reload
+            if [[ "$out" == source:* ]]; then
+                local name="${out#source:}"
+                name="${name%%:*}"
+                local path="${out#source:*:}"
+                source "$path"
+                echo "\033[1m\033[32m✓ \033[0mreloaded ${name}"
+            fi
             ;;
         list|info|new|rm|rename)
             gaiety "$@"
