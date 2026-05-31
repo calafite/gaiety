@@ -10,7 +10,7 @@ gai() {
             gaiety "$@"
             ;;
         *)
-            echo "Usage: gai [reload|list|info <name>|new <name>|rm <name>]"
+            echo "Usage: gai [reload|list|info <name>|new <name>|rm <name>]rename <old> <new>"
             ;;
     esac
 }
