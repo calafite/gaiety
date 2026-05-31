@@ -1,7 +1,7 @@
 use crate::loader::types::ModuleStatus;
 use crate::loader::Loader;
 use anyhow::Result;
-use colored::Colorize;``
+use colored::Colorize;
 
 pub fn run(dirs: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
