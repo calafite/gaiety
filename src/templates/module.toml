@@ -1,0 +1,13 @@
+[module]
+name = "{{MODULE_NAME}}"
+description = "Write a short description here"
+version = "1.0.0"
+deps = ["core"]
+tags = []
+requires_cmd = []
+
+[api]
+functions = ["help_{{MODULE_NAME}}"]
+variables = []
+# aliases = { top = "btop" }
+# completions = { "help_{{MODULE_NAME}}" = "_files" }

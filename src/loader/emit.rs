@@ -11,28 +11,8 @@ impl Loader {
         out.push_str(&self.generate_reset_fn(&modules));
 
         let dir_str = self.dir.to_string_lossy();
-        out.push_str(&format!(
-            r#"
-# ZRT Shell Wrapper
-zrt() {{
-    case "$1" in
-        reload)
-            echo "\033[1m\033[34m=> \033[0m\033[2m[zrt] running reset and reloading modules...\033[0m"
-            _zrt_reset
-            eval "$(zrt-loader --dir "{}" init)"
-            echo "\033[1m\033[32m✓ \033[0mzrt reloaded"
-            ;;
-        list|info|new|rm)
-            zrt-loader --dir "{}" "$@"
-            ;;
-        *)
-            echo "Usage: zrt [reload|list|info <name>|new <name>|rm <name>]"
-            ;;
-    esac
-}}
-"#,
-            dir_str, dir_str
-        ));
+        let wrapper_template = include_str!("../templates/wrapper.zsh");
+        out.push_str(&wrapper_template.replace("{{DIR}}", &dir_str));
 
         out.push_str("\n# --- Load Modules ---\n");
         let mut all_completions = Vec::new();
