@@ -6,6 +6,9 @@ use std::path::Path;
 impl Loader {
     pub(crate) fn validate_commands(&self, modules: &mut [DiscoveredModule]) {
         for m in modules.iter_mut() {
+            if m.status != ModuleStatus::Loaded {
+                continue;
+            }
             for cmd in &m.manifest.module.requires_cmd {
                 if !self.has_command(cmd) {
                     m.status = ModuleStatus::SkippedMissingCmd(cmd.clone());
@@ -35,7 +38,12 @@ impl Loader {
             let loaded: std::collections::HashMap<String, String> = modules
                 .iter()
                 .filter(|m| m.status == ModuleStatus::Loaded)
-                .map(|m| (m.manifest.module.name.clone(), m.manifest.module.version.clone()))
+                .map(|m| {
+                    (
+                        m.manifest.module.name.clone(),
+                        m.manifest.module.version.clone(),
+                    )
+                })
                 .collect();
 
             for m in modules.iter_mut() {
@@ -45,7 +53,8 @@ impl Loader {
                 for dep in &m.manifest.module.deps {
                     match loaded.get(&dep.name) {
                         None => {
-                            m.status = ModuleStatus::SkippedMissingDep(dep.name.clone());
+                            m.status =
+                                ModuleStatus::SkippedMissingDep(dep.name.clone());
                             changed = true;
                             break;
                         }
@@ -61,10 +70,11 @@ impl Loader {
                                         break;
                                     }
                                     Err(e) => {
-                                        m.status = ModuleStatus::SkippedBadConstraint(format!(
-                                            "dep '{}': {}",
-                                            dep.name, e
-                                        ));
+                                        m.status =
+                                            ModuleStatus::SkippedBadConstraint(format!(
+                                                "dep '{}': {}",
+                                                dep.name, e
+                                            ));
                                         changed = true;
                                         break;
                                     }
@@ -95,7 +105,8 @@ impl Loader {
             for comp_fn in m.manifest.api.completions.values() {
                 if !all_content.contains(comp_fn.as_str()) {
                     warnings.push(format!(
-                        "module '{}': completion function '{}' not found in any init.zsh",
+                        "module '{}': completion function '{}' not found in any init.zsh \
+                         (if it is defined in a sourced sub-file, this warning can be ignored)",
                         m.manifest.module.name, comp_fn
                     ));
                 }
@@ -125,7 +136,6 @@ fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
     let version = parse_version(version)
         .ok_or_else(|| format!("invalid version string '{}'", version))?;
 
-    // Two-character operators must be checked before their one-character prefixes.
     if let Some(req) = constraint.strip_prefix(">=") {
         let req = parse_version(req.trim())
             .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
@@ -151,7 +161,7 @@ fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
             .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
         return Ok(cmp_version(&version, &req) == 0);
     }
-    if let Some(req) = constraint.strip_prefix('~') { 
+    if let Some(req) = constraint.strip_prefix('~') {
         let req = parse_version(req.trim())
             .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
         return Ok(
@@ -160,7 +170,7 @@ fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
                 && version.get(1) == req.get(1),
         );
     }
-    if let Some(req) = constraint.strip_prefix('^') { 
+    if let Some(req) = constraint.strip_prefix('^') {
         let req = parse_version(req.trim())
             .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
         return Ok(cmp_version(&version, &req) >= 0 && version.get(0) == req.get(0));

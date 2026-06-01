@@ -15,10 +15,13 @@ pub fn run(dirs: String) -> Result<()> {
 
         let status_colored = match &m.status {
             ModuleStatus::Loaded => format!("{:<8}", "loaded").green(),
+            ModuleStatus::WarnDuplicateDep(_) => format!("{:<8}", "warn").yellow(),
             ModuleStatus::SkippedMissingCmd(_)
             | ModuleStatus::SkippedMissingAnyCmd(_)
             | ModuleStatus::SkippedMissingDep(_) => format!("{:<8}", "skipped").yellow(),
-            ModuleStatus::SkippedBadConstraint(_) => format!("{:<8}", "error").red(),
+            ModuleStatus::SkippedCycle(_) => format!("{:<8}", "cycle").red(),
+            ModuleStatus::SkippedBadConstraint(_)
+            | ModuleStatus::FailedManifest(_) => format!("{:<8}", "error").red(),
         };
 
         let version_colored = format!("v{:<7}", m.manifest.module.version).dimmed();
@@ -49,20 +52,43 @@ pub fn run(dirs: String) -> Result<()> {
 
         match &m.status {
             ModuleStatus::SkippedMissingCmd(cmd) => {
-                let msg = format!("↳ missing required command: {}", cmd);
-                println!("    {}", msg.yellow());
+                println!("    {}", format!("↳ missing required command: {}", cmd).yellow());
             }
             ModuleStatus::SkippedMissingAnyCmd(cmds) => {
-                let msg = format!("↳ none of these commands found: {}", cmds.join(", "));
-                println!("    {}", msg.yellow());
+                println!(
+                    "    {}",
+                    format!("↳ none of these commands found: {}", cmds.join(", ")).yellow()
+                );
             }
             ModuleStatus::SkippedMissingDep(dep) => {
-                let msg = format!("↳ missing or skipped dependency: {}", dep);
-                println!("    {}", msg.yellow());
+                println!(
+                    "    {}",
+                    format!("↳ missing or skipped dependency: {}", dep).yellow()
+                );
             }
             ModuleStatus::SkippedBadConstraint(detail) => {
-                let msg = format!("↳ bad version constraint: {}", detail);
-                println!("    {}", msg.red());
+                println!(
+                    "    {}",
+                    format!("↳ bad version constraint: {}", detail).red()
+                );
+            }
+            ModuleStatus::SkippedCycle(path) => {
+                println!(
+                    "    {}",
+                    format!("↳ circular dependency: {}", path.join(" → ")).red()
+                );
+            }
+            ModuleStatus::FailedManifest(detail) => {
+                println!(
+                    "    {}",
+                    format!("↳ manifest error: {}", detail).red()
+                );
+            }
+            ModuleStatus::WarnDuplicateDep(dep) => {
+                println!(
+                    "    {}",
+                    format!("↳ duplicate dep entry in module.toml: '{}'", dep).yellow()
+                );
             }
             ModuleStatus::Loaded => {}
         }
