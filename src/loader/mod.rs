@@ -7,17 +7,22 @@ use anyhow::Result;
 use std::path::PathBuf;
 use types::DiscoveredModule;
 
-pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::Error> {
+pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::Error> { 
     if let Ok(v) = semver::Version::parse(s) {
         return Ok(v);
     }
-    match s.split('.').count() {
-        1 => semver::Version::parse(&format!("{}.0.0", s)),
-        2 => semver::Version::parse(&format!("{}.0", s)),
-        _ => semver::Version::parse(s),
-    }
+    let (base, remainder) = if let Some(idx) = s.find(|c| c == '-' || c == '+') {
+        s.split_at(idx)
+    } else {
+        (s, "")
+    }; 
+    let padded_base = match base.split('.').count() {
+        1 => format!("{}.0.0", base),
+        2 => format!("{}.0", base),
+        _ => base.to_string(),
+    }; 
+    semver::Version::parse(&format!("{}{}", padded_base, remainder))
 }
-
 pub struct Loader {
     pub dirs: Vec<PathBuf>,
 }
