@@ -6,6 +6,7 @@ pub mod new;
 pub mod path;
 pub mod rm;
 pub mod rename;
+pub mod sync;
 
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
@@ -38,8 +39,14 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Generate and emit the Zsh initialization script
+    /// Generate and emit the Zsh initialization script to stdout
     Init,
+    /// Write the init script to a cache file for zero-latency shell startup
+    Sync {
+        /// Override the output path (default: see above)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
     /// Browse modules interactively (requires fzf)
     Browse,
     /// List all modules and their current status
@@ -83,6 +90,7 @@ pub enum Commands {
 pub fn execute(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Init => init::run(cli.dirs),
+        Commands::Sync { output } => sync::run(cli.dirs, output),
         Commands::Browse => browse::run(cli.dirs),
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
