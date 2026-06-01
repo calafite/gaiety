@@ -2,18 +2,17 @@ use crate::loader::Loader;
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
 use std::fs;
+use std::path::{Path, PathBuf};
 use toml_edit::DocumentMut;
 
 pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    let target = modules.iter().find(|m| m.manifest.module.name == old_name);
-
-    let m = match target {
-        Some(m) => m,
-        None => bail!("Module '{}' not found.", old_name),
-    };
+    let m = modules
+        .iter()
+        .find(|m| m.manifest.module.name == old_name)
+        .ok_or_else(|| anyhow::anyhow!("Module '{}' not found.", old_name))?;
 
     if modules.iter().any(|m| m.manifest.module.name == new_name) {
         bail!("Module '{}' already exists.", new_name);
@@ -25,7 +24,8 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         [prefix, _] => format!("{}_{}", prefix, new_name),
         _ => new_name.clone(),
     };
-    let new_dir = old_dir.parent().unwrap().join(&new_dir_name);
+    let parent = old_dir.parent().unwrap();
+    let new_dir = parent.join(&new_dir_name);
 
     let own_toml_path = old_dir.join("module.toml");
     let own_content = fs::read_to_string(&own_toml_path)
@@ -33,7 +33,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     let own_updated = set_module_name(&own_content, &new_name)
         .with_context(|| format!("Failed to rewrite {}", own_toml_path.display()))?;
 
-    let mut dependent_rewrites: Vec<(String, std::path::PathBuf, String, String)> = Vec::new();
+    let mut dependent_rewrites: Vec<(String, PathBuf, String)> = Vec::new();
     for dep_module in &modules {
         if dep_module.manifest.module.name == old_name {
             continue;
@@ -44,7 +44,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
                 .with_context(|| format!("Failed to read {}", path.display()))?;
             let updated = rename_dep(&content, &old_name, &new_name)
                 .with_context(|| format!("Failed to rewrite dep in {}", path.display()))?;
-            dependent_rewrites.push((dep_module.manifest.module.name.clone(), path, content, updated));
+            dependent_rewrites.push((dep_module.manifest.module.name.clone(), path, updated));
         }
     }
 
@@ -54,38 +54,67 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
             new_dir.display()
         );
     }
-
+ 
     println!("\n{} {}\n", "::".bold().cyan(), "Rename Module".bold().cyan());
-    println!("  {:<10} {} {} {}", "name:".dimmed(), old_name.green(), "→".dimmed(), new_name.green());
-    println!("  {:<10} {} {} {}", "dir:".dimmed(), dir_name.to_string().dimmed(), "→".dimmed(), new_dir_name.dimmed());
+    println!(
+        "  {:<10} {} {} {}",
+        "name:".dimmed(),
+        old_name.green(),
+        "→".dimmed(),
+        new_name.green()
+    );
+    println!(
+        "  {:<10} {} {} {}",
+        "dir:".dimmed(),
+        dir_name.to_string().dimmed(),
+        "→".dimmed(),
+        new_dir_name.dimmed()
+    );
     if !dependent_rewrites.is_empty() {
         let dep_names = dependent_rewrites
             .iter()
-            .map(|(name, _, _, _)| name.as_str())
+            .map(|(name, _, _)| name.as_str())
             .collect::<Vec<_>>()
             .join(", ");
         println!("  {:<10} {}", "deps:".dimmed(), dep_names.dimmed());
     }
     println!();
 
-    copy_dir(old_dir, &new_dir)
-        .with_context(|| format!("Failed to copy {} → {}", old_dir.display(), new_dir.display()))?;
+    let tmp_dir = parent.join(format!(".gai_rename_tmp_{}", new_dir_name));
+    if tmp_dir.exists() {
+        fs::remove_dir_all(&tmp_dir)
+            .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
+    }
 
-    let write_result = (|| -> Result<()> {
-        let new_toml_path = new_dir.join("module.toml");
-        fs::write(&new_toml_path, own_updated)
-            .with_context(|| format!("Failed to write {}", new_toml_path.display()))?;
+    let mut tmp_guard = TempDirGuard::new(tmp_dir.clone());
 
-        for (_, path, _original, updated) in &dependent_rewrites {
-            fs::write(path, updated)
-                .with_context(|| format!("Failed to write {}", path.display()))?;
+    copy_dir(old_dir, &tmp_dir)
+        .with_context(|| format!("Failed to copy to temp dir: {}", tmp_dir.display()))?;
+
+    fs::write(tmp_dir.join("module.toml"), &own_updated)
+        .with_context(|| format!("Failed to write module.toml into {}", tmp_dir.display()))?;
+
+    fs::rename(&tmp_dir, &new_dir).with_context(|| {
+        format!(
+            "Failed to rename {} → {}",
+            tmp_dir.display(),
+            new_dir.display()
+        )
+    })?;
+    tmp_guard.defuse(); 
+
+    for (_, path, updated) in &dependent_rewrites {
+        let tmp_path = path.with_file_name(".module.toml.gai_tmp");
+
+        let result = fs::write(&tmp_path, updated)
+            .and_then(|_| fs::rename(&tmp_path, path));
+
+        if result.is_err() {
+            let _ = fs::remove_file(&tmp_path);
+            result.with_context(|| {
+                format!("Failed to update dependency TOML at {}", path.display())
+            })?;
         }
-        Ok(())
-    })();
-
-    if let Err(e) = write_result {
-        let _ = fs::remove_dir_all(&new_dir);
-        return Err(e.context("Rename aborted; original module is unchanged"));
     }
 
     fs::remove_dir_all(old_dir)
@@ -95,7 +124,30 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     Ok(())
 }
 
-fn copy_dir(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
+struct TempDirGuard {
+    path: PathBuf,
+    active: bool,
+}
+
+impl TempDirGuard {
+    fn new(path: PathBuf) -> Self {
+        Self { path, active: true }
+    }
+
+    fn defuse(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        if self.active && self.path.exists() {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
+fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir(dst)
         .with_context(|| format!("Failed to create dir: {}", dst.display()))?;
     for entry in fs::read_dir(src)
@@ -108,7 +160,11 @@ fn copy_dir(src: &std::path::Path, dst: &std::path::Path) -> Result<()> {
             copy_dir(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path).with_context(|| {
-                format!("Failed to copy {} → {}", src_path.display(), dst_path.display())
+                format!(
+                    "Failed to copy {} → {}",
+                    src_path.display(),
+                    dst_path.display()
+                )
             })?;
         }
     }
@@ -119,9 +175,7 @@ fn set_module_name(content: &str, new_name: &str) -> Result<String> {
     let mut doc = content
         .parse::<DocumentMut>()
         .context("Failed to parse TOML")?;
-
     doc["module"]["name"] = toml_edit::value(new_name);
-
     Ok(doc.to_string())
 }
 
@@ -145,7 +199,6 @@ fn rename_dep(content: &str, old_name: &str, new_name: &str) -> Result<String> {
         .and_then(|m| m.get_mut("deps"))
         .and_then(|d| d.as_array_mut())
     {
-        // Inline array form: deps = [{ name = "foo", version = ">=1.0.0" }]
         for dep in deps.iter_mut() {
             if let Some(tbl) = dep.as_inline_table_mut() {
                 if tbl.get("name").and_then(|v| v.as_str()) == Some(old_name) {
