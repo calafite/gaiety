@@ -35,7 +35,7 @@ impl Loader {
 
     pub fn get_modules(&self) -> Result<Vec<DiscoveredModule>> {
         let mut modules = self.discover_modules()?;
-        self.sort_modules(&mut modules);
+        self.sort_modules(&mut modules); 
         self.validate_commands(&mut modules);
         self.validate_any_commands(&mut modules);
         self.validate_dependencies(&mut modules);
