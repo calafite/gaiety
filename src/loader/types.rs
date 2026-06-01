@@ -29,13 +29,3 @@ pub enum ModuleStatus {
     /// A dep entry is listed more than once in module.toml.
     WarnDuplicateDep(String),
 }
-
-impl ModuleStatus {
-    pub fn is_loaded(&self) -> bool {
-        matches!(self, ModuleStatus::Loaded)
-    }
-
-    pub fn is_skipped(&self) -> bool {
-        !self.is_loaded()
-    }
-}
