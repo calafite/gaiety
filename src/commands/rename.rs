@@ -54,7 +54,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
             new_dir.display()
         );
     }
- 
+
     println!("\n{} {}\n", "::".bold().cyan(), "Rename Module".bold().cyan());
     println!(
         "  {:<10} {} {} {}",
@@ -80,6 +80,17 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     }
     println!();
 
+    let mut dep_temps: Vec<(PathBuf, PathBuf)> = Vec::new(); // (tmp, target)
+    let mut dep_temp_guard = TempFilesGuard::new();
+
+    for (_, target_path, updated) in &dependent_rewrites {
+        let tmp = target_path.with_file_name(".module.toml.gai_tmp");
+        fs::write(&tmp, updated)
+            .with_context(|| format!("Failed to write dep temp at {}", tmp.display()))?;
+        dep_temp_guard.add(tmp.clone());
+        dep_temps.push((tmp, target_path.clone()));
+    }
+
     let tmp_dir = parent.join(format!(".gai_rename_tmp_{}", new_dir_name));
     if tmp_dir.exists() {
         fs::remove_dir_all(&tmp_dir)
@@ -101,21 +112,14 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
             new_dir.display()
         )
     })?;
-    tmp_guard.defuse(); 
-
-    for (_, path, updated) in &dependent_rewrites {
-        let tmp_path = path.with_file_name(".module.toml.gai_tmp");
-
-        let result = fs::write(&tmp_path, updated)
-            .and_then(|_| fs::rename(&tmp_path, path));
-
-        if result.is_err() {
-            let _ = fs::remove_file(&tmp_path);
-            result.with_context(|| {
-                format!("Failed to update dependency TOML at {}", path.display())
-            })?;
-        }
+    tmp_guard.defuse();
+ 
+    for (tmp_path, target_path) in &dep_temps {
+        fs::rename(tmp_path, target_path).with_context(|| {
+            format!("Failed to commit dep TOML at {}", target_path.display())
+        })?;
     }
+    dep_temp_guard.defuse();
 
     fs::remove_dir_all(old_dir)
         .with_context(|| format!("Failed to remove original dir: {}", old_dir.display()))?;
@@ -124,6 +128,8 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     Ok(())
 }
 
+//guards
+//
 struct TempDirGuard {
     path: PathBuf,
     active: bool,
@@ -146,6 +152,40 @@ impl Drop for TempDirGuard {
         }
     }
 }
+
+struct TempFilesGuard {
+    paths: Vec<PathBuf>,
+    active: bool,
+}
+
+impl TempFilesGuard {
+    fn new() -> Self {
+        Self {
+            paths: Vec::new(),
+            active: true,
+        }
+    }
+
+    fn add(&mut self, path: PathBuf) {
+        self.paths.push(path);
+    }
+
+    fn defuse(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for TempFilesGuard {
+    fn drop(&mut self) {
+        if self.active {
+            for path in &self.paths {
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+}
+
+//helpers
 
 fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir(dst)

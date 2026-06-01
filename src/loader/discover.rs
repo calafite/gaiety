@@ -40,12 +40,23 @@ impl Loader {
                             .next()
                             .and_then(|s| s.parse::<u32>().ok());
 
+                        let status = if super::parse_version_lenient(&manifest.module.version)
+                            .is_ok()
+                        {
+                            ModuleStatus::Loaded
+                        } else {
+                            ModuleStatus::FailedManifest(format!(
+                                "invalid version string: '{}' (expected semver, e.g. 1.2.3)",
+                                manifest.module.version
+                            ))
+                        };
+
                         modules.push(DiscoveredModule {
                             path,
                             manifest,
                             prefix_order,
                             dir_index,
-                            status: ModuleStatus::Loaded,
+                            status,
                         });
                         continue;
                     }

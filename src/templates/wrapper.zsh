@@ -16,6 +16,12 @@ gai() {
                 fi
 
                 echo "\033[1m\033[34m=> \033[0m\033[2m[gai] reloading module $2...\033[0m"
+
+                local _gai_mod_reset="_gai_reset_$2"
+                if typeset -f "$_gai_mod_reset" > /dev/null 2>&1; then
+                    "$_gai_mod_reset"
+                fi
+
                 source "$mod_path"
                 echo "\033[1m\033[32m✓ \033[0mreloaded $2"
             else

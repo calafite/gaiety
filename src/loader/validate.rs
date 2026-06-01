@@ -102,7 +102,7 @@ impl Loader {
                 continue;
             }
             for comp_fn in m.manifest.api.completions.values() {
-                if !all_content.contains(comp_fn.as_str()) {
+                if !is_function_defined(&all_content, comp_fn) {
                     warnings.push(format!(
                         "module '{}': completion function '{}' not found in any init.zsh \
                          (if it is defined in a sourced sub-file, this warning can be ignored)",
@@ -132,20 +132,22 @@ impl Loader {
 }
 
 fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
-    let v = parse_lenient(version)
+    let v = super::parse_version_lenient(version)
         .map_err(|e| format!("invalid version '{}': {}", version, e))?;
     let req = semver::VersionReq::parse(constraint)
         .map_err(|e| format!("invalid constraint '{}': {}", constraint, e))?;
     Ok(req.matches(&v))
 }
 
-fn parse_lenient(s: &str) -> Result<semver::Version, semver::Error> { 
-    if let Ok(v) = semver::Version::parse(s) {
-        return Ok(v);
-    }
-    match s.split('.').count() {
-        1 => semver::Version::parse(&format!("{}.0.0", s)),
-        2 => semver::Version::parse(&format!("{}.0", s)),
-        _ => semver::Version::parse(s),
-    }
+fn is_function_defined(content: &str, fn_name: &str) -> bool {
+    let posix_paren = format!("{}(", fn_name);
+    let posix_space = format!("{} (", fn_name);
+    let keyword_form = format!("function {}", fn_name);
+    content.lines().any(|line| {
+        let t = line.trim_start();
+        !t.starts_with('#')
+            && (t.starts_with(&posix_paren)
+                || t.starts_with(&posix_space)
+                || t.starts_with(&keyword_form))
+    })
 }
