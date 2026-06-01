@@ -10,7 +10,7 @@ In `.zshrc`:
 
 ```zsh
 export GAI_DIRS="/usr/share/gaiety/modules:~/.config/gaiety/modules"
-eval "$(gai init)"
+eval "$(gaiety init)"
 ```
 
 `GAI_DIRS` is colon-separated. Directories load left to right. Put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
@@ -76,23 +76,34 @@ ll() { eza -lh --icons --group-directories-first "$@"; }
 
 ## Commands
 
-```
-gai init                    emit the zsh initialization script
+```text
+gaiety init                 emit the zsh initialization script
 gai list                    list all modules and their status
 gai info <name>             show metadata and public api for a module
+gai browse                  browse modules interactively (requires fzf)
 gai new <name>              scaffold a new module from templates
 gai rename <old> <new>      rename a module and update all dependents
 gai rm <name>               remove a module and renumber remaining
+gai reload [<name>]         reload all modules or just a specific one
 ```
 
 ### gai list
 
-```
+```text
 :: Module Registry
 
   list            loaded    v1.0.0   deps:[]
   zoxide          skipped   v1.0.0   deps:[]
     ↳ none of these commands found: zoxide
+```
+
+### gai browse
+
+Interactive fuzzy finder for your modules ~ requires `fzf`. 
+Shows module status, version, and metadata. Hit enter to instantly reload the selected module in your current session.
+
+```zsh
+gai browse
 ```
 
 ### gai new
@@ -125,7 +136,7 @@ Prompts for confirmation, deletes the directory, and renumbers remaining modules
 
 ```zsh
 gai rm mything
-# ? remove module 'mything'? [y/N]
+# ? remove module 'mything'? [y/n]
 ```
 
 ---
@@ -134,9 +145,9 @@ gai rm mything
 
 A module is skipped if:
 
-- `requires_cmd` ~ one of the listed commands is missing from `PATH`
-- `requires_any_cmd` ~ none of the listed commands are in `PATH`
-- `deps` ~ a dependency was not loaded (cascades)
+* `requires_cmd` ~ one of the listed commands is missing from `PATH`
+* `requires_any_cmd` ~ none of the listed commands are in `PATH`
+* `deps` ~ a dependency was not loaded (cascades)
 
 Skipped modules show up in `gai list` with a reason. Their `init.zsh` is not sourced and their API is not registered.
 
@@ -144,17 +155,23 @@ Skipped modules show up in `gai list` with a reason. Their `init.zsh` is not sou
 
 ## Multiple directories
 
-Modules across all `GAI_DIRS` are treated as a single unified registry: nique names, unique prefixes, shared dependency graph. If the same module name exists in multiple directories, the last directory wins.
+Modules across all `GAI_DIRS` are treated as a single unified registry: unique names, unique prefixes, shared dependency graph. If the same module name exists in multiple directories, the last directory wins.
 
 ---
 
 ## Reload
 
+You can reload the entire registry or just target a single module if you're actively working on it.
+
 ```zsh
+# reload all modules
 gai reload
+
+# reload just one module
+gai reload mything
 ```
 
-Calls `_gai_reset` (unsets all registered functions, variables and aliases), then re-evals `gai init`.
+When reloading everything, gaiety calls `_gai_reset` (unsets all registered functions, variables and aliases), then re-evaluates `gaiety init`. When reloading a single module, it just sources that module's `init.zsh` directly.
 
 ---
 
@@ -174,5 +191,3 @@ _rt_comp_dirs() { _path_files -/; }
 # files and directories
 _rt_comp_paths() { _path_files; }
 ```
-
----
