@@ -26,10 +26,13 @@ pub fn run(dirs: String) -> Result<()> {
     for m in &modules {
         let status_colored = match &m.status {
             ModuleStatus::Loaded => "\x1b[32mloaded \x1b[0m",
+            ModuleStatus::WarnDuplicateDep(_) => "\x1b[33mwarn   \x1b[0m",
             ModuleStatus::SkippedMissingCmd(_)
             | ModuleStatus::SkippedMissingAnyCmd(_)
             | ModuleStatus::SkippedMissingDep(_) => "\x1b[33mskipped\x1b[0m",
-            ModuleStatus::SkippedBadConstraint(_) => "\x1b[31merror  \x1b[0m",
+            ModuleStatus::SkippedCycle(_)
+            | ModuleStatus::SkippedBadConstraint(_)
+            | ModuleStatus::FailedManifest(_) => "\x1b[31merror  \x1b[0m",
         };
 
         let version = format!("v{}", m.manifest.module.version);

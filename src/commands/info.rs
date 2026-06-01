@@ -7,7 +7,9 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    let target = modules.iter().find(|m| m.manifest.module.name == module_name);
+    let target = modules
+        .iter()
+        .find(|m| m.manifest.module.name == module_name);
 
     let m = match target {
         Some(m) => m,
@@ -22,7 +24,9 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     let status_text = match &m.status {
         ModuleStatus::Loaded => "loaded".green(),
-        ModuleStatus::SkippedBadConstraint(_) => "error".red(),
+        ModuleStatus::WarnDuplicateDep(_) => "warn".yellow(),
+        ModuleStatus::SkippedBadConstraint(_) | ModuleStatus::FailedManifest(_) => "error".red(),
+        ModuleStatus::SkippedCycle(_) => "cycle".red(),
         _ => "skipped".yellow(),
     };
 
@@ -84,6 +88,27 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
                 "  {} bad version constraint: {}",
                 kw("error"),
                 detail.red()
+            );
+        }
+        ModuleStatus::SkippedCycle(path) => {
+            println!(
+                "  {} circular dependency: {}",
+                kw("error"),
+                path.join(" → ").red()
+            );
+        }
+        ModuleStatus::FailedManifest(detail) => {
+            println!(
+                "  {} {}",
+                kw("error"),
+                detail.red()
+            );
+        }
+        ModuleStatus::WarnDuplicateDep(dep) => {
+            println!(
+                "  {} duplicate dep entry in module.toml: '{}'",
+                kw("warning"),
+                dep.yellow()
             );
         }
         ModuleStatus::Loaded => {}

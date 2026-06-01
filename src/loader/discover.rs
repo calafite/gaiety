@@ -17,14 +17,23 @@ impl Loader {
                 let entry = entry?;
                 let path = entry.path();
 
-                if path.is_dir() {
-                    let toml_path = path.join("module.toml");
-                    if toml_path.exists() {
-                        let content = fs::read_to_string(&toml_path)?;
-                        let manifest: Manifest = toml::from_str(&content).with_context(|| {
-                            format!("Failed to parse manifest: {}", toml_path.display())
-                        })?;
+                if !path.is_dir() {
+                    continue;
+                }
 
+                let toml_path = path.join("module.toml");
+                if !toml_path.exists() {
+                    continue;
+                }
+
+                let status = match fs::read_to_string(&toml_path)
+                    .with_context(|| format!("Failed to read {}", toml_path.display()))
+                    .and_then(|content| {
+                        toml::from_str::<Manifest>(&content).with_context(|| {
+                            format!("Failed to parse manifest: {}", toml_path.display())
+                        })
+                    }) {
+                    Ok(manifest) => {
                         let dir_name = path.file_name().unwrap().to_string_lossy();
                         let prefix_order = dir_name
                             .split('_')
@@ -38,11 +47,26 @@ impl Loader {
                             dir_index,
                             status: ModuleStatus::Loaded,
                         });
+                        continue;
                     }
-                }
+                    Err(e) => ModuleStatus::FailedManifest(e.to_string()),
+                };
+
+                let placeholder = Manifest::broken(
+                    path.file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| "<unknown>".to_string()),
+                );
+                modules.push(DiscoveredModule {
+                    path,
+                    manifest: placeholder,
+                    prefix_order: None,
+                    dir_index,
+                    status,
+                });
             }
         }
- 
+
         let mut seen: HashMap<String, ()> = HashMap::new();
         modules.reverse();
         modules.retain(|m| seen.insert(m.manifest.module.name.clone(), ()).is_none());
@@ -50,11 +74,21 @@ impl Loader {
 
         Ok(modules)
     }
- 
+
     pub(crate) fn sort_modules(&self, modules: &mut Vec<DiscoveredModule>) {
         let n = modules.len();
         if n == 0 {
             return;
+        }
+
+        for m in modules.iter_mut() {
+            let mut seen_deps: HashSet<&str> = HashSet::new();
+            for dep in &m.manifest.module.deps {
+                if !seen_deps.insert(dep.name.as_str()) {
+                    m.status = ModuleStatus::WarnDuplicateDep(dep.name.clone());
+                    break;
+                }
+            }
         }
 
         let name_to_idx: HashMap<&str, usize> = modules
@@ -67,12 +101,21 @@ impl Loader {
         let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
 
         for (i, m) in modules.iter().enumerate() {
+            if matches!(
+                m.status,
+                ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_)
+            ) {
+                continue;
+            }
+
+            let mut seen_deps: HashSet<&str> = HashSet::new();
             for dep in &m.manifest.module.deps {
+                if !seen_deps.insert(dep.name.as_str()) {
+                    continue;
+                }
                 if let Some(&dep_idx) = name_to_idx.get(dep.name.as_str()) {
-                    if !adj[dep_idx].contains(&i) {
-                        adj[dep_idx].push(i);
-                        in_degree[i] += 1;
-                    }
+                    adj[dep_idx].push(i);
+                    in_degree[i] += 1;
                 }
             }
         }
@@ -107,8 +150,17 @@ impl Loader {
         }
 
         if order.len() < n {
-            let seen: HashSet<usize> = order.iter().copied().collect();
-            let mut tail: Vec<usize> = (0..n).filter(|i| !seen.contains(i)).collect();
+            let scheduled: HashSet<usize> = order.iter().copied().collect();
+            let cyclic: Vec<usize> = (0..n).filter(|i| !scheduled.contains(i)).collect();
+
+            let cyclic_set: HashSet<usize> = cyclic.iter().copied().collect();
+
+            for &start in &cyclic {
+                let cycle_path = find_cycle_path(start, &adj, &cyclic_set, &modules);
+                modules[start].status = ModuleStatus::SkippedCycle(cycle_path);
+            }
+
+            let mut tail = cyclic;
             tail.sort_by(|&a, &b| {
                 let (ma, mb) = (&modules[a], &modules[b]);
                 ma.dir_index.cmp(&mb.dir_index).then_with(|| {
@@ -127,4 +179,59 @@ impl Loader {
             modules.drain(..).map(Some).collect();
         modules.extend(order.into_iter().map(|i| slots[i].take().unwrap()));
     }
+}
+
+fn find_cycle_path(
+    start: usize,
+    adj: &[Vec<usize>],
+    cyclic_set: &HashSet<usize>,
+    modules: &[DiscoveredModule],
+) -> Vec<String> {
+    let mut visited: HashSet<usize> = HashSet::new();
+    let mut stack: Vec<usize> = Vec::new();
+
+    if dfs_cycle(start, start, adj, cyclic_set, &mut visited, &mut stack) {
+        let mut path: Vec<String> = stack
+            .iter()
+            .map(|&i| modules[i].manifest.module.name.clone())
+            .collect();
+        path.push(modules[start].manifest.module.name.clone());
+        path
+    } else {
+        let mut path = vec![modules[start].manifest.module.name.clone()];
+        for &j in &adj[start] {
+            if cyclic_set.contains(&j) {
+                path.push(modules[j].manifest.module.name.clone());
+            }
+        }
+        path
+    }
+}
+
+fn dfs_cycle(
+    target: usize,
+    current: usize,
+    adj: &[Vec<usize>],
+    cyclic_set: &HashSet<usize>,
+    visited: &mut HashSet<usize>,
+    stack: &mut Vec<usize>,
+) -> bool {
+    stack.push(current);
+    for &next in &adj[current] {
+        if !cyclic_set.contains(&next) {
+            continue;
+        }
+        if next == target {
+            return true;
+        }
+        if visited.contains(&next) {
+            continue;
+        }
+        visited.insert(next);
+        if dfs_cycle(target, next, adj, cyclic_set, visited, stack) {
+            return true;
+        }
+    }
+    stack.pop();
+    false
 }

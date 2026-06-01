@@ -8,6 +8,23 @@ pub struct Manifest {
     pub api: ApiMeta,
 }
 
+impl Manifest {
+    pub fn broken(dir_name: String) -> Self {
+        Self {
+            module: ModuleMeta {
+                name: dir_name,
+                description: Some("<manifest could not be parsed>".to_string()),
+                version: "0.0.0".to_string(),
+                deps: Vec::new(),
+                tags: Vec::new(),
+                requires_cmd: Vec::new(),
+                requires_any_cmd: Vec::new(),
+            },
+            api: ApiMeta::default(),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ModuleMeta {
     pub name: String,

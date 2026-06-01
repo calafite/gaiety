@@ -46,7 +46,18 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
         .filter(|m| m.status == ModuleStatus::Loaded)
         .count();
 
-    let skipped = modules.len() - loaded;
+    let warned = modules
+        .iter()
+        .filter(|m| matches!(m.status, ModuleStatus::WarnDuplicateDep(_)))
+        .count();
+
+    let skipped = modules.len() - loaded - warned;
+
+    let warn_note = if warned > 0 {
+        format!(", {} with warnings", warned)
+    } else {
+        String::new()
+    };
     let skip_note = if skipped > 0 {
         format!(", {} skipped", skipped)
     } else {
@@ -54,10 +65,11 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
     };
 
     eprintln!(
-        "{} synced {} module{}{} → {}",
+        "{} synced {} module{}{}{} → {}",
         "✓".bold().green(),
         loaded,
         if loaded == 1 { "" } else { "s" },
+        warn_note,
         skip_note,
         cache_path.display().to_string().dimmed()
     );
