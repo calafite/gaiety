@@ -53,8 +53,7 @@ impl Loader {
                 for dep in &m.manifest.module.deps {
                     match loaded.get(&dep.name) {
                         None => {
-                            m.status =
-                                ModuleStatus::SkippedMissingDep(dep.name.clone());
+                            m.status = ModuleStatus::SkippedMissingDep(dep.name.clone());
                             changed = true;
                             break;
                         }
@@ -133,70 +132,20 @@ impl Loader {
 }
 
 fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
-    let version = parse_version(version)
-        .ok_or_else(|| format!("invalid version string '{}'", version))?;
-
-    if let Some(req) = constraint.strip_prefix(">=") {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) >= 0);
-    }
-    if let Some(req) = constraint.strip_prefix("<=") {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) <= 0);
-    }
-    if let Some(req) = constraint.strip_prefix('>') {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) > 0);
-    }
-    if let Some(req) = constraint.strip_prefix('<') {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) < 0);
-    }
-    if let Some(req) = constraint.strip_prefix('=') {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) == 0);
-    }
-    if let Some(req) = constraint.strip_prefix('~') {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(
-            cmp_version(&version, &req) >= 0
-                && version.get(0) == req.get(0)
-                && version.get(1) == req.get(1),
-        );
-    }
-    if let Some(req) = constraint.strip_prefix('^') {
-        let req = parse_version(req.trim())
-            .ok_or_else(|| format!("invalid version in constraint '{}'", constraint))?;
-        return Ok(cmp_version(&version, &req) >= 0 && version.get(0) == req.get(0));
-    }
-
-    Err(format!(
-        "unrecognised constraint '{}' (expected one of: =, >=, >, <=, <, ~, ^)",
-        constraint
-    ))
+    let v = parse_lenient(version)
+        .map_err(|e| format!("invalid version '{}': {}", version, e))?;
+    let req = semver::VersionReq::parse(constraint)
+        .map_err(|e| format!("invalid constraint '{}': {}", constraint, e))?;
+    Ok(req.matches(&v))
 }
 
-fn parse_version(s: &str) -> Option<Vec<u64>> {
-    if s.is_empty() {
-        return None;
+fn parse_lenient(s: &str) -> Result<semver::Version, semver::Error> { 
+    if let Ok(v) = semver::Version::parse(s) {
+        return Ok(v);
     }
-    s.split('.').map(|part| part.parse::<u64>().ok()).collect()
-}
-
-fn cmp_version(a: &[u64], b: &[u64]) -> i64 {
-    let len = a.len().max(b.len());
-    for i in 0..len {
-        let av = a.get(i).copied().unwrap_or(0);
-        let bv = b.get(i).copied().unwrap_or(0);
-        if av != bv {
-            return if av > bv { 1 } else { -1 };
-        }
+    match s.split('.').count() {
+        1 => semver::Version::parse(&format!("{}.0.0", s)),
+        2 => semver::Version::parse(&format!("{}.0", s)),
+        _ => semver::Version::parse(s),
     }
-    0
 }

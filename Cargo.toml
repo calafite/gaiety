@@ -7,10 +7,12 @@ edition = "2024"
 anyhow = "*"
 clap = { version = "*", features = ["derive", "env"] }
 serde = { version = "*", features = ["derive"] }
+semver = "*"
 toml = "*"
 toml_edit = "*"
 colored = "*"
 shellexpand = "*"
+
 
 [[bin]]
 name = "gaiety"
