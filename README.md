@@ -10,10 +10,14 @@ In `.zshrc`:
 
 ```zsh
 export GAI_DIRS="/usr/share/gaiety/modules:~/.config/gaiety/modules"
-eval "$(gaiety init)"
+export GAI_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/gaiety/init.zsh"
+[[ -f "$GAI_CACHE" ]] || gaiety sync
+source "$GAI_CACHE"
 ```
 
 `GAI_DIRS` is colon-separated. Directories load left to right. Put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
+
+`gaiety sync` writes the init script to `$GAI_CACHE` once. After that, startup is just a `source`. Run `gai reload` after adding or editing modules, it resyncs and re-sources automatically.
 
 ---
 
@@ -61,6 +65,23 @@ variables  = []
 # completions = { "lt" = "_rt_comp_dirs" }
 ```
 
+### Version constraints
+
+Dep entries accept standard semver operators:
+
+```text
+=1.2.3          exact
+>=1.2.3         at least
+>1.2.3          strictly greater
+<=1.2.3         at most
+<1.2.3          strictly less
+~1.2.3          patch-compatible  (>=1.2.3, <1.3.0)
+^1.2.3          minor-compatible  (>=1.2.3, <2.0.0)
+>=1.0, <2.0     compound (comma-separated)
+```
+
+Short versions are accepted: `1` and `1.2` are treated as `1.0.0` and `1.2.0`. Pre-release versions (`1.0.0-alpha`) are supported in both `version` and constraints. Note that `>=1.0.0` does not match `1.0.1-alpha` — to match a pre-release the constraint must include one: `>=1.0.0-alpha`.
+
 ### init.zsh
 
 Plain zsh. The manifest declares what it exposes, the script implements it. Prefix internal functions with `_modulename_` to avoid collisions.
@@ -78,8 +99,10 @@ ll() { eza -lh --icons --group-directories-first "$@"; }
 
 ```text
 gaiety init                 emit the zsh initialization script
+gai sync                    write the init script to the cache file
 gai list                    list all modules and their status
 gai info <name>             show metadata and public api for a module
+gai path <name>             print the path to a module
 gai browse                  browse modules interactively (requires fzf)
 gai new <name>              scaffold a new module from templates
 gai rename <old> <new>      rename a module and update all dependents
