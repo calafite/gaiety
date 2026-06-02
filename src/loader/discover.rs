@@ -1,6 +1,6 @@
 use super::types::{DiscoveredModule, ModuleStatus};
 use super::Loader;
-use crate::manifest::Manifest;
+use super::manifest::Manifest;
 use anyhow::{Context, Result};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet};
