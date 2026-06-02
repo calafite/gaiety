@@ -14,7 +14,13 @@ pub fn run(dirs: String) -> Result<()> {
         let name_colored = name_padded.bold().green();
 
         let status_colored = match &m.status {
-            ModuleStatus::Loaded => format!("{:<8}", "loaded").green(),
+            ModuleStatus::Loaded => {
+                if m.manifest.api.defer_on_cmd {
+                    format!("{:<8}", "lazy").cyan()
+                } else {
+                    format!("{:<8}", "loaded").green()
+                }
+            }
             ModuleStatus::WarnDuplicateDep(_) => format!("{:<8}", "warn").yellow(),
             ModuleStatus::SkippedMissingCmd(_)
             | ModuleStatus::SkippedMissingAnyCmd(_)

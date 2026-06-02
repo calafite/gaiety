@@ -33,18 +33,88 @@ impl Loader {
             if m.status == ModuleStatus::Loaded {
                 let init_script = m.path.join("init.zsh");
                 if init_script.exists() {
-                    out.push_str(&format!(
-                        "source '{}'\n",
-                        sq_escape(&init_script.display().to_string())
-                    ));
-                }
+                    if m.manifest.api.defer_on_cmd {
+                        let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
 
-                for (name, expansion) in &m.manifest.api.aliases {
-                    out.push_str(&format!(
-                        "alias '{}={}'\n",
-                        sq_escape(name),
-                        sq_escape(expansion)
-                    ));
+                        let mut stubs_to_unfunction = Vec::new();
+                        stubs_to_unfunction.push(loader_fn.clone());
+                        for func in &m.manifest.api.functions {
+                            stubs_to_unfunction.push(func.clone());
+                        }
+                        for alias_name in m.manifest.api.aliases.keys() {
+                            stubs_to_unfunction.push(alias_name.clone());
+                        }
+                        for comp_fn in m.manifest.api.completions.values() {
+                            stubs_to_unfunction.push(comp_fn.clone());
+                        }
+
+                        let unfunction_list = stubs_to_unfunction
+                            .iter()
+                            .map(|f| format!("'{}'", sq_escape(f)))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+
+                        out.push_str(&format!("{}() {{\n", loader_fn));
+                        out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
+                        out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
+
+                        for (name, expansion) in &m.manifest.api.aliases {
+                            out.push_str(&format!(
+                                "  alias '{}={}'\n",
+                                sq_escape(name),
+                                sq_escape(expansion)
+                            ));
+                        }
+                        out.push_str("}\n");
+
+                        for func in &m.manifest.api.functions {
+                            let escaped_func = sq_escape(func);
+                            out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_func));
+                            out.push_str(&format!("{}() {{\n", escaped_func));
+                            out.push_str(&format!("  {}\n", loader_fn));
+                            out.push_str(&format!("  '{}' \"$@\"\n", escaped_func));
+                            out.push_str("}\n");
+                        }
+
+                        for alias_name in m.manifest.api.aliases.keys() {
+                            let escaped_alias = sq_escape(alias_name);
+                            // unalias first: same parse issue
+                            out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_alias));
+                            out.push_str(&format!("{}() {{\n", escaped_alias));
+                            out.push_str(&format!("  {}\n", loader_fn));
+                            out.push_str(&format!("  eval '{} \"$@\"'\n", escaped_alias));
+                            out.push_str("}\n");
+                        }
+
+                        let mut unique_comps = m.manifest.api.completions.values().collect::<Vec<_>>();
+                        unique_comps.sort();
+                        unique_comps.dedup();
+                        for comp_fn in unique_comps {
+                            let escaped_comp = sq_escape(comp_fn);
+                            out.push_str(&format!("if ! type '{}' &>/dev/null; then\n", escaped_comp));
+                            // unalias inside the guard before defining
+                            out.push_str(&format!("  unalias '{}' 2>/dev/null\n", escaped_comp));
+                            out.push_str(&format!("  {}() {{\n", escaped_comp));
+                            out.push_str(&format!("    unfunction '{}' 2>/dev/null\n", escaped_comp));
+                            out.push_str(&format!("    {}\n", loader_fn));
+                            out.push_str(&format!("    '{}' \"$@\"\n", escaped_comp));
+                            out.push_str("  }\n");
+                            out.push_str("fi\n");
+                        }
+                    } else {
+                        out.push_str(&format!(
+                            "source '{}'\n",
+                            sq_escape(&init_script.display().to_string())
+                        ));
+
+                        for (name, expansion) in &m.manifest.api.aliases {
+                            out.push_str(&format!(
+                                "alias '{}={}'\n",
+                                sq_escape(name),
+                                sq_escape(expansion)
+                            ));
+                        }
+                    }
                 }
 
                 for (cmd, comp_fn) in &m.manifest.api.completions {
@@ -82,6 +152,7 @@ impl Loader {
                 all_funcs.extend(m.manifest.api.functions.iter().cloned());
                 all_vars.extend(m.manifest.api.variables.iter().cloned());
                 all_aliases.extend(m.manifest.api.aliases.keys().cloned());
+                all_funcs.extend(m.manifest.api.aliases.keys().cloned());
             }
         }
 
@@ -124,9 +195,11 @@ fn generate_module_reset_fn(m: &DiscoveredModule) -> Option<String> {
     let mut out = String::new();
     out.push_str(&format!("_gai_reset_{}() {{\n", m.manifest.module.name));
 
-    if !api.functions.is_empty() {
-        let quoted = api
-            .functions
+    let mut funcs_to_unset = api.functions.clone();
+    funcs_to_unset.extend(api.aliases.keys().cloned());
+
+    if !funcs_to_unset.is_empty() {
+        let quoted = funcs_to_unset
             .iter()
             .map(|f| format!("'{}'", sq_escape(f)))
             .collect::<Vec<_>>()

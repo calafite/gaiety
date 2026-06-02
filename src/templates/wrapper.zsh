@@ -43,11 +43,11 @@ gai() {
 
             gai reload "$name" "$mod_path"
             ;;
-        list|info|new|rm|rename|profile)
+        list|info|new|rm|rename|profile|path)
             gaiety "$@"
             ;;
         *)
-            echo "Usage: gai [reload [<name>]|sync|browse|list|info <name>|new <name>|rm <name>|rename <old> <new>|profile]"
+            echo "Usage: gai [reload [<name>]|sync|browse|list|info <name>|new <name>|rm <name>|rename <old> <new>|profile|path <name>]"
             ;;
     esac
 }

@@ -56,4 +56,6 @@ pub struct ApiMeta {
     pub aliases: HashMap<String, String>,
     #[serde(default)]
     pub completions: HashMap<String, String>,
+    #[serde(default)]
+    pub defer_on_cmd: bool,
 }
