@@ -71,18 +71,37 @@ pub fn run(dirs: String) -> Result<()> {
     // Sort by duration descending
     results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
+    let max_ms = results.iter().map(|(_, ms)| *ms).fold(0.0f64, f64::max);
+
     println!("\n{} {}\n", "::".bold().cyan(), "Module Load Profile".bold().cyan());
-    println!("{:<24} {:>12}", "Module".bold(), "Time (ms)".bold());
-    println!("{}", "-".repeat(38));
+    println!("{:<24} {:>12}  {}", "Module".bold(), "Time (ms)".bold(), "Relative".bold());
+    println!("{}", "-".repeat(56));
 
     let mut total = 0.0;
     for (name, ms) in &results {
         total += ms;
         let name_colored = name.bold().green();
-        let ms_colored = format!("{:.3} ms", ms).yellow();
-        println!("{:<24} {:>12}", name_colored, ms_colored);
+        
+        // Color-code based on performance thresholds
+        let ms_colored = if *ms < 1.0 {
+            format!("{:.3} ms", ms).green()
+        } else if *ms < 5.0 {
+            format!("{:.3} ms", ms).yellow()
+        } else {
+            format!("{:.3} ms", ms).red().bold()
+        };
+
+        // Generate a relative bar chart
+        let bar_width = if max_ms > 0.0 {
+            ((*ms / max_ms) * 16.0).round() as usize
+        } else {
+            0
+        };
+        let bar = "█".repeat(bar_width).cyan();
+
+        println!("{:<24} {:>12}  {}", name_colored, ms_colored, bar);
     }
-    println!("{}", "-".repeat(38));
+    println!("{}", "-".repeat(56));
     println!("{:<24} {:>12}", "Total".bold(), format!("{:.3} ms", total).bold().cyan());
 
     Ok(())
