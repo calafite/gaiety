@@ -63,6 +63,9 @@ variables  = []
 
 # aliases = { top = "btop" }
 # completions = { "lt" = "_rt_comp_dirs" }
+
+# defer sourcing until first use ~ see Lazy Loading below
+defer_on_cmd = false
 ```
 
 ### Version constraints
@@ -108,6 +111,7 @@ gai new <name>              scaffold a new module from templates
 gai rename <old> <new>      rename a module and update all dependents
 gai rm <name>               remove a module and renumber remaining
 gai reload [<name>]         reload all modules or just a specific one
+gai profile                 benchmark the load time of every module
 ```
 
 ### gai list
@@ -116,13 +120,44 @@ gai reload [<name>]         reload all modules or just a specific one
 :: Module Registry
 
   list            loaded    v1.0.0   deps:[]
-  zoxide          skipped   v1.0.0   deps:[]
-    ↳ none of these commands found: zoxide
+  zoxide          lazy      v1.0.0   deps:[]
+  skim            skipped   v1.0.0   deps:[]
+    ↳ none of these commands found: sk
 ```
+
+Modules with `defer_on_cmd = true` show as `lazy` rather than `loaded`.
+
+### gai info
+
+Shows full metadata for a single module, including whether it is lazy-loaded.
+
+```text
+:: Module: list
+
+  status         loaded
+  file           01_list
+  path           ~/.config/gaiety/modules/01_list
+  desc           directory listing with eza/exa
+  version        1.0.0
+  deps           —
+  tags           —
+  lazy           no
+
+  Public API
+    functions:
+      ls
+      ll
+      la
+      lt
+      lta
+      help_ls
+```
+
+A lazy module shows `lazy  yes` and its `init.zsh` is not sourced until one of its declared functions is first called.
 
 ### gai browse
 
-Interactive fuzzy finder for your modules ~ requires `fzf`. 
+Interactive fuzzy finder for your modules ~ requires `fzf`.
 Shows module status, version, and metadata. Hit enter to instantly reload the selected module in your current session.
 
 ```zsh
@@ -138,6 +173,8 @@ gai new mything
 # creates: 03_mything/module.toml
 #          03_mything/init.zsh
 ```
+
+New modules are created with `defer_on_cmd = true` by default. Remove or set to `false` if the module needs to run code at shell startup (e.g. setting variables, running `eval "$(tool init zsh)"`).
 
 Use `--target` to write to a specific directory:
 
@@ -161,6 +198,43 @@ Prompts for confirmation, deletes the directory, and renumbers remaining modules
 gai rm mything
 # ? remove module 'mything'? [y/n]
 ```
+
+### gai profile
+
+Benchmarks the source time of every loaded module by running each `init.zsh` in an isolated zsh subprocess and reporting elapsed time.
+
+```text
+:: Module Load Profile
+
+Module                 Time (ms)  Relative
+────────────────────────────────────────────────────
+zoxide                  12.431 ms  ████████████████████
+list                     4.209 ms  ███████
+skim                     1.876 ms  ███
+fzf_fm                   0.341 ms  █
+────────────────────────────────────────────────────
+Total                   18.857 ms
+```
+
+Times are color-coded: green under 1 ms, yellow 1–5 ms, red above 5 ms. Lazy modules are shown in blue with a `(def)` suffix, their time reflects the one-time cost paid on first use, not at shell startup.
+
+Use `gai profile` to identify slow modules and decide which ones to make lazy.
+
+---
+
+## Lazy loading
+
+Setting `defer_on_cmd = true` in `[api]` tells gaiety not to source the module's `init.zsh` at shell startup. Instead, thin stub functions are generated for every name in `functions`, `aliases`, and `completions`. The first time any of those names is invoked, the real `init.zsh` is sourced and the call is forwarded transparently.
+
+```toml
+[api]
+functions    = ["ls", "ll", "la"]
+defer_on_cmd = true
+```
+
+This is safe for modules that only define functions or aliases. It is **not** appropriate for modules that need to run code eagerly at startup; for example, modules that export variables, call `eval "$(tool init zsh)"`, or set up keybindings. Those modules should use `defer_on_cmd = false`.
+
+`gai list` shows lazy modules with the status `lazy`. `gai info <name>` shows `lazy  yes` in the metadata block. `gai profile` marks lazy modules with `(def)` and reports their deferred source time.
 
 ---
 
