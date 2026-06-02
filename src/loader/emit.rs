@@ -35,8 +35,7 @@ impl Loader {
                 if init_script.exists() {
                     if m.manifest.api.defer_on_cmd {
                         let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
-                        
-                        // Collect all stubs to unfunction
+                         
                         let mut stubs_to_unfunction = Vec::new();
                         stubs_to_unfunction.push(loader_fn.clone());
                         for func in &m.manifest.api.functions {
@@ -55,12 +54,10 @@ impl Loader {
                             .collect::<Vec<_>>()
                             .join(" ");
 
-                        // Generate the loader function
                         out.push_str(&format!("{}() {{\n", loader_fn));
                         out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
                         out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
                         
-                        // Define the real aliases now that the stubs are cleared
                         for (name, expansion) in &m.manifest.api.aliases {
                             out.push_str(&format!(
                                 "  alias '{}={}'\n",
@@ -70,7 +67,6 @@ impl Loader {
                         }
                         out.push_str("}\n");
 
-                        // Generate function stubs
                         for func in &m.manifest.api.functions {
                             let escaped_func = sq_escape(func);
                             out.push_str(&format!("{}() {{\n", escaped_func));
@@ -79,7 +75,6 @@ impl Loader {
                             out.push_str("}\n");
                         }
 
-                        // Generate alias stubs (as functions that eval the real alias once loaded)
                         for alias_name in m.manifest.api.aliases.keys() {
                             let escaped_alias = sq_escape(alias_name);
                             out.push_str(&format!("{}() {{\n", escaped_alias));
@@ -88,7 +83,6 @@ impl Loader {
                             out.push_str("}\n");
                         }
 
-                        // Generate completion function stubs
                         let mut unique_comps = m.manifest.api.completions.values().collect::<Vec<_>>();
                         unique_comps.sort();
                         unique_comps.dedup();
@@ -152,8 +146,7 @@ impl Loader {
             if m.status == ModuleStatus::Loaded {
                 all_funcs.extend(m.manifest.api.functions.iter().cloned());
                 all_vars.extend(m.manifest.api.variables.iter().cloned());
-                all_aliases.extend(m.manifest.api.aliases.keys().cloned());
-                // Deferred aliases are generated as functions, so we must also unset them as functions
+                all_aliases.extend(m.manifest.api.aliases.keys().cloned()); 
                 all_funcs.extend(m.manifest.api.aliases.keys().cloned());
             }
         }
@@ -197,8 +190,7 @@ fn generate_module_reset_fn(m: &DiscoveredModule) -> Option<String> {
     let mut out = String::new();
     out.push_str(&format!("_gai_reset_{}() {{\n", m.manifest.module.name));
 
-    let mut funcs_to_unset = api.functions.clone();
-    // Deferred aliases are generated as functions, so we must also unset them as functions
+    let mut funcs_to_unset = api.functions.clone(); 
     funcs_to_unset.extend(api.aliases.keys().cloned());
 
     if !funcs_to_unset.is_empty() {
