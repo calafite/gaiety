@@ -11,6 +11,6 @@ requires_any_cmd = []
 [api]
 functions  = ["help_{{MODULE_NAME}}"]
 variables  = []
-# defer_on_cmd = true
+defer_on_cmd = true
 # aliases      = { top = "btop" }
 # completions  = { "help_{{MODULE_NAME}}" = "_files" }
