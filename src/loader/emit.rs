@@ -33,18 +33,86 @@ impl Loader {
             if m.status == ModuleStatus::Loaded {
                 let init_script = m.path.join("init.zsh");
                 if init_script.exists() {
-                    out.push_str(&format!(
-                        "source '{}'\n",
-                        sq_escape(&init_script.display().to_string())
-                    ));
-                }
+                    if m.manifest.api.defer_on_cmd {
+                        let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
+                        
+                        // Collect all stubs to unfunction
+                        let mut stubs_to_unfunction = Vec::new();
+                        stubs_to_unfunction.push(loader_fn.clone());
+                        for func in &m.manifest.api.functions {
+                            stubs_to_unfunction.push(func.clone());
+                        }
+                        for alias_name in m.manifest.api.aliases.keys() {
+                            stubs_to_unfunction.push(alias_name.clone());
+                        }
+                        for comp_fn in m.manifest.api.completions.values() {
+                            stubs_to_unfunction.push(comp_fn.clone());
+                        }
 
-                for (name, expansion) in &m.manifest.api.aliases {
-                    out.push_str(&format!(
-                        "alias '{}={}'\n",
-                        sq_escape(name),
-                        sq_escape(expansion)
-                    ));
+                        let unfunction_list = stubs_to_unfunction
+                            .iter()
+                            .map(|f| format!("'{}'", sq_escape(f)))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+
+                        // Generate the loader function
+                        out.push_str(&format!("{}() {{\n", loader_fn));
+                        out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
+                        out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
+                        
+                        // Define the real aliases now that the stubs are cleared
+                        for (name, expansion) in &m.manifest.api.aliases {
+                            out.push_str(&format!(
+                                "  alias '{}={}'\n",
+                                sq_escape(name),
+                                sq_escape(expansion)
+                            ));
+                        }
+                        out.push_str("}\n");
+
+                        // Generate function stubs
+                        for func in &m.manifest.api.functions {
+                            let escaped_func = sq_escape(func);
+                            out.push_str(&format!("{}() {{\n", escaped_func));
+                            out.push_str(&format!("  {}\n", loader_fn));
+                            out.push_str(&format!("  '{}' \"$@\"\n", escaped_func));
+                            out.push_str("}\n");
+                        }
+
+                        // Generate alias stubs (as functions that eval the real alias once loaded)
+                        for alias_name in m.manifest.api.aliases.keys() {
+                            let escaped_alias = sq_escape(alias_name);
+                            out.push_str(&format!("{}() {{\n", escaped_alias));
+                            out.push_str(&format!("  {}\n", loader_fn));
+                            out.push_str(&format!("  eval '{} \"$@\"'\n", escaped_alias));
+                            out.push_str("}\n");
+                        }
+
+                        // Generate completion function stubs
+                        let mut unique_comps = m.manifest.api.completions.values().collect::<Vec<_>>();
+                        unique_comps.sort();
+                        unique_comps.dedup();
+                        for comp_fn in unique_comps {
+                            let escaped_comp = sq_escape(comp_fn);
+                            out.push_str(&format!("{}() {{\n", escaped_comp));
+                            out.push_str(&format!("  {}\n", loader_fn));
+                            out.push_str(&format!("  '{}' \"$@\"\n", escaped_comp));
+                            out.push_str("}\n");
+                        }
+                    } else {
+                        out.push_str(&format!(
+                            "source '{}'\n",
+                            sq_escape(&init_script.display().to_string())
+                        ));
+
+                        for (name, expansion) in &m.manifest.api.aliases {
+                            out.push_str(&format!(
+                                "alias '{}={}'\n",
+                                sq_escape(name),
+                                sq_escape(expansion)
+                            ));
+                        }
+                    }
                 }
 
                 for (cmd, comp_fn) in &m.manifest.api.completions {
