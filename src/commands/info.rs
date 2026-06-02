@@ -116,12 +116,16 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     println!();
 
-    let api = &m.manifest.api;
+        let api = &m.manifest.api;
     let has_api =
-        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
+        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty() || api.defer_on_cmd;
 
     if has_api {
         println!("  {}", "Public API".bold().cyan());
+
+        if api.defer_on_cmd {
+            println!("    {} {}", "deferred:".dimmed(), "yes".green());
+        }
 
         if !api.functions.is_empty() {
             println!("    {}", "functions:".dimmed());
