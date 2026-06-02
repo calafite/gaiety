@@ -151,3 +151,25 @@ fn is_function_defined(content: &str, fn_name: &str) -> bool {
                 || t.starts_with(&keyword_form))
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_satisfies() {
+        assert!(satisfies("1.2.3", ">=1.0.0").unwrap());
+        assert!(!satisfies("0.9.0", ">=1.0.0").unwrap());
+        assert!(satisfies("2.0.0", "^2.0.0").unwrap());
+        assert!(satisfies("1.5", "<2.0.0").unwrap());
+    }
+
+    #[test]
+    fn test_is_function_defined() {
+        assert!(is_function_defined("my_func() {\n}", "my_func"));
+        assert!(is_function_defined("my_func () {\n}", "my_func"));
+        assert!(is_function_defined("function my_func {\n}", "my_func"));
+        assert!(!is_function_defined("# my_func() {\n}", "my_func"));
+        assert!(!is_function_defined("other_func() {\n}", "my_func"));
+    }
+}

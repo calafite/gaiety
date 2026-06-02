@@ -77,3 +77,18 @@ fn is_valid_name(name: &str) -> bool {
     }
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_name() {
+        assert!(is_valid_name("my_module"));
+        assert!(is_valid_name("_private_mod"));
+        assert!(is_valid_name("mod123"));
+        assert!(!is_valid_name("123mod"));
+        assert!(!is_valid_name("my-mod"));
+        assert!(!is_valid_name(""));
+    }
+}

@@ -77,3 +77,33 @@ fn renumber_modules(dir: &PathBuf) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_temp_dir(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("gai_test_rm_{}_{}", name, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros()));
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn test_renumber_modules() {
+        let temp = create_temp_dir("renumber");
+        let m1 = temp.join("05_foo");
+        let m2 = temp.join("12_bar");
+        fs::create_dir_all(&m1).unwrap();
+        fs::create_dir_all(&m2).unwrap();
+        fs::write(m1.join("module.toml"), "").unwrap();
+        fs::write(m2.join("module.toml"), "").unwrap();
+
+        renumber_modules(&temp).unwrap();
+
+        assert!(temp.join("01_foo").exists());
+        assert!(temp.join("02_bar").exists());
+
+        let _ = fs::remove_dir_all(&temp);
+    }
+}

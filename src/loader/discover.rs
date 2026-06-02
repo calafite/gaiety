@@ -246,3 +246,82 @@ fn dfs_cycle(
     stack.pop();
     false
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn create_temp_dir(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("gai_test_discover_{}_{}", name, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros()));
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn test_discover_and_sort() {
+        let temp = create_temp_dir("sort");
+        let m1_dir = temp.join("01_m1");
+        let m2_dir = temp.join("02_m2");
+        fs::create_dir_all(&m1_dir).unwrap();
+        fs::create_dir_all(&m2_dir).unwrap();
+
+        fs::write(m1_dir.join("module.toml"), r#"
+[module]
+name = "m1"
+version = "1.0.0"
+deps = [ { name = "m2" } ]
+"#).unwrap();
+
+        fs::write(m2_dir.join("module.toml"), r#"
+[module]
+name = "m2"
+version = "2.0.0"
+"#).unwrap();
+
+        let loader = Loader { dirs: vec![temp.clone()] };
+        let mut modules = loader.discover_modules().unwrap();
+        assert_eq!(modules.len(), 2);
+
+        loader.sort_modules(&mut modules);
+        // m2 has no deps, m1 depends on m2. So m2 must come first.
+        assert_eq!(modules[0].manifest.module.name, "m2");
+        assert_eq!(modules[1].manifest.module.name, "m1");
+
+        let _ = fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_cycle_detection() {
+        let temp = create_temp_dir("cycle");
+        let m1_dir = temp.join("01_m1");
+        let m2_dir = temp.join("02_m2");
+        fs::create_dir_all(&m1_dir).unwrap();
+        fs::create_dir_all(&m2_dir).unwrap();
+
+        fs::write(m1_dir.join("module.toml"), r#"
+[module]
+name = "m1"
+version = "1.0.0"
+deps = [ { name = "m2" } ]
+"#).unwrap();
+
+        fs::write(m2_dir.join("module.toml"), r#"
+[module]
+name = "m2"
+version = "2.0.0"
+deps = [ { name = "m1" } ]
+"#).unwrap();
+
+        let loader = Loader { dirs: vec![temp.clone()] };
+        let mut modules = loader.discover_modules().unwrap();
+        loader.sort_modules(&mut modules);
+
+        let has_cycle = modules.iter().any(|m| matches!(m.status, ModuleStatus::SkippedCycle(_)));
+        assert!(has_cycle);
+
+        let _ = fs::remove_dir_all(&temp);
+    }
+}

@@ -64,3 +64,22 @@ impl Loader {
         self.dirs.last().unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_version_lenient() {
+        assert_eq!(parse_version_lenient("1.2.3").unwrap(), semver::Version::new(1, 2, 3));
+        assert_eq!(parse_version_lenient("1.2").unwrap(), semver::Version::new(1, 2, 0));
+        assert_eq!(parse_version_lenient("1").unwrap(), semver::Version::new(1, 0, 0));
+        assert_eq!(parse_version_lenient("1.2-alpha").unwrap(), semver::Version::parse("1.2.0-alpha").unwrap());
+    }
+
+    #[test]
+    fn test_loader_new_empty_or_invalid() {
+        assert!(Loader::new("").is_err());
+        assert!(Loader::new("/nonexistent/path/gaiety/test").is_err());
+    }
+}

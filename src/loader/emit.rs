@@ -232,3 +232,34 @@ fn generate_module_reset_fn(m: &DiscoveredModule) -> Option<String> {
 fn sq_escape(s: &str) -> String {
     s.replace('\'', r"'\''")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::loader::manifest::{Manifest, ModuleMeta};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_sq_escape() {
+        assert_eq!(sq_escape("hello"), "hello");
+        assert_eq!(sq_escape("don't"), r"don'\''t");
+    }
+
+    #[test]
+    fn test_generate_reset_fn() {
+        let loader = Loader { dirs: vec![] };
+        let mut m = DiscoveredModule {
+            path: PathBuf::from("/tmp"),
+            manifest: Manifest::broken("test".to_string()),
+            prefix_order: None,
+            dir_index: 0,
+            status: ModuleStatus::Loaded,
+        };
+        m.manifest.api.functions = vec!["foo".to_string()];
+        m.manifest.api.variables = vec!["BAR".to_string()];
+
+        let reset_script = loader.generate_reset_fn(&[m]);
+        assert!(reset_script.contains("unset -f 'foo'"));
+        assert!(reset_script.contains("unset 'BAR'"));
+    }
+}

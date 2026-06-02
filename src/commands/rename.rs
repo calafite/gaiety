@@ -250,3 +250,29 @@ fn rename_dep(content: &str, old_name: &str, new_name: &str) -> Result<String> {
 
     Ok(doc.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_module_name() {
+        let toml = "[module]\nname = \"old\"\nversion = \"1.0.0\"";
+        let updated = set_module_name(toml, "new").unwrap();
+        assert!(updated.contains("name = \"new\""));
+    }
+
+    #[test]
+    fn test_rename_dep() {
+        let toml = r#"
+[module]
+name = "my_module"
+deps = [
+  { name = "old_dep", version = "1.0" }
+]
+"#;
+        let updated = rename_dep(toml, "old_dep", "new_dep").unwrap();
+        assert!(updated.contains("new_dep"));
+        assert!(!updated.contains("old_dep"));
+    }
+}
