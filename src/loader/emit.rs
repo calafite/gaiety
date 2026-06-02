@@ -236,7 +236,7 @@ fn sq_escape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::loader::manifest::{Manifest, ModuleMeta};
+    use crate::loader::manifest::Manifest;
     use std::path::PathBuf;
 
     #[test]
