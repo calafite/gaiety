@@ -1,3 +1,4 @@
+pub mod manifest;
 pub mod types;
 mod discover;
 mod emit;
@@ -7,7 +8,7 @@ use anyhow::Result;
 use std::path::PathBuf;
 use types::DiscoveredModule;
 
-pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::Error> { 
+pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::Error> {
     if let Ok(v) = semver::Version::parse(s) {
         return Ok(v);
     }
@@ -15,14 +16,15 @@ pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::
         s.split_at(idx)
     } else {
         (s, "")
-    }; 
+    };
     let padded_base = match base.split('.').count() {
         1 => format!("{}.0.0", base),
         2 => format!("{}.0", base),
         _ => base.to_string(),
-    }; 
+    };
     semver::Version::parse(&format!("{}{}", padded_base, remainder))
 }
+
 pub struct Loader {
     pub dirs: Vec<PathBuf>,
 }

@@ -1,4 +1,4 @@
-use crate::manifest::Manifest;
+use super::manifest::Manifest;
 use std::path::PathBuf;
 
 #[derive(Debug)]
