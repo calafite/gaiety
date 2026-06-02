@@ -53,16 +53,6 @@ impl Loader {
             }
         }
 
-        let has_concurrent_candidates = stages.iter().any(|stage| {
-            stage.iter().filter(|m| !m.manifest.api.defer_on_cmd).count() > 1
-        });
-
-        if has_concurrent_candidates {
-            out.push_str("_GAI_TMP=$(mktemp -d)\n");
-            out.push_str("_gai_cleanup() {\n  rm -rf \"$_GAI_TMP\"\n}\n");
-            out.push_str("trap _gai_cleanup EXIT\n\n");
-        }
-
         for (stage_idx, stage) in stages.iter().enumerate() {
             let non_deferred: Vec<_> = stage
                 .iter()
@@ -144,33 +134,19 @@ impl Loader {
                 }
             }
 
-            // Process non-deferred modules
-            if non_deferred.len() > 1 {
-                out.push_str(&format!("# --- Stage {} (Concurrent) ---\n", stage_idx));
-                let mut pids = Vec::new();
-                for (i, m) in non_deferred.iter().enumerate() {
+            // Process non-deferred modules sequentially.
+            // Subshell backgrounding cannot be used here: zsh subshells cannot
+            // propagate bindkey, zstyle, setopt, or fpath mutations back to the
+            // parent shell, which breaks native shell plugins that rely on those
+            // side-effects at source time.
+            if !non_deferred.is_empty() {
+                out.push_str(&format!("# --- Stage {} ---\n", stage_idx));
+                for m in non_deferred {
                     let init_script = m.path.join("init.zsh");
-                    let out_file = format!("\"$_GAI_TMP/s{}_{}\"", stage_idx, i);
-                    out.push_str("(\n");
-                    out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
-                    out.push_str("  typeset -f\n");
-                    out.push_str("  alias -L\n");
-                    if !m.manifest.api.variables.is_empty() {
-                        let vars = m.manifest.api.variables
-                            .iter()
-                            .map(|v| format!("'{}'", sq_escape(v)))
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        out.push_str(&format!("  typeset -p {} 2>/dev/null\n", vars));
-                    }
-                    out.push_str(&format!(") > {} &\n", out_file));
-                    out.push_str(&format!("_gai_pid_{}_{}=$!\n", stage_idx, i));
-                    pids.push(format!("$_gai_pid_{}_{}", stage_idx, i));
-                }
-                out.push_str(&format!("wait {} 2>/dev/null\n", pids.join(" ")));
-                for (i, m) in non_deferred.iter().enumerate() {
-                    let out_file = format!("\"$_GAI_TMP/s{}_{}\"", stage_idx, i);
-                    out.push_str(&format!("[[ -f {} ]] && source {}\n", out_file, out_file));
+                    out.push_str(&format!(
+                        "source '{}'\n",
+                        sq_escape(&init_script.display().to_string())
+                    ));
                     for (name, expansion) in &m.manifest.api.aliases {
                         out.push_str(&format!(
                             "alias '{}={}'\n",
@@ -178,19 +154,6 @@ impl Loader {
                             sq_escape(expansion)
                         ));
                     }
-                }
-            } else if let Some(m) = non_deferred.first() {
-                let init_script = m.path.join("init.zsh");
-                out.push_str(&format!(
-                    "source '{}'\n",
-                    sq_escape(&init_script.display().to_string())
-                ));
-                for (name, expansion) in &m.manifest.api.aliases {
-                    out.push_str(&format!(
-                        "alias '{}={}'\n",
-                        sq_escape(name),
-                        sq_escape(expansion)
-                    ));
                 }
             }
 

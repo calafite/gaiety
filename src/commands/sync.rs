@@ -3,7 +3,7 @@ use crate::loader::Loader;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn default_cache_path() -> PathBuf {
     if let Ok(p) = std::env::var("GAI_CACHE") {
@@ -40,6 +40,8 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
 
     fs::write(&cache_path, &zsh_code)
         .with_context(|| format!("Failed to write cache: {}", cache_path.display()))?;
+ 
+    zcompile_parallel(&modules, &cache_path);
 
     let loaded = modules
         .iter()
@@ -75,4 +77,44 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
     );
 
     Ok(())
+}
+
+fn zcompile_parallel(modules: &[crate::loader::types::DiscoveredModule], cache_path: &Path) {
+    let mut script = String::new();
+
+    for m in modules {
+        if m.status != ModuleStatus::Loaded {
+            continue;
+        }
+        let init_path = m.path.join("init.zsh");
+        if init_path.exists() {
+            script.push_str(&format!(
+                "zcompile -- '{}' 2>/dev/null &\n",
+                sq_escape(&init_path.to_string_lossy())
+            ));
+        }
+    }
+ 
+    script.push_str(&format!(
+        "zcompile -- '{}' 2>/dev/null &\n",
+        sq_escape(&cache_path.to_string_lossy())
+    ));
+    script.push_str("wait\n");
+
+    let temp_path = std::env::temp_dir()
+        .join(format!("gaiety_zcompile_{}.zsh", std::process::id()));
+
+    if fs::write(&temp_path, &script).is_ok() {
+        let _ = std::process::Command::new("zsh")
+            .arg("-f")
+            .arg(&temp_path)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        let _ = fs::remove_file(&temp_path);
+    }
+}
+
+fn sq_escape(s: &str) -> String {
+    s.replace('\'', r"'\''")
 }
