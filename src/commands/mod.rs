@@ -7,6 +7,7 @@ pub mod path;
 pub mod rm;
 pub mod rename;
 pub mod sync;
+pub mod profile;
 
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
@@ -85,6 +86,8 @@ pub enum Commands {
         /// New module name
         new: String,
     },
+    /// Benchmark the exact load time of every module
+    Profile,
 }
 
 pub fn execute(cli: Cli) -> Result<()> {
@@ -98,5 +101,6 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm { module, dir } => rm::run(cli.dirs, module, dir),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
+        Commands::Profile => profile::run(cli.dirs),
     }
 }
