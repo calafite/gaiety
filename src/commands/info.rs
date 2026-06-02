@@ -60,6 +60,15 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     println!("  {} {}", kw("version"), m.manifest.module.version);
     println!("  {} {}", kw("deps"), deps);
     println!("  {} {}", kw("tags"), tags);
+    println!(
+        "  {} {}",
+        kw("lazy"),
+        if m.manifest.api.defer_on_cmd {
+            "yes".cyan()
+        } else {
+            "no".dimmed()
+        }
+    );
 
     match &m.status {
         ModuleStatus::SkippedMissingCmd(cmd) => {
@@ -116,16 +125,12 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     println!();
 
-        let api = &m.manifest.api;
+    let api = &m.manifest.api;
     let has_api =
-        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty() || api.defer_on_cmd;
+        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
 
     if has_api {
         println!("  {}", "Public API".bold().cyan());
-
-        if api.defer_on_cmd {
-            println!("    {} {}", "deferred:".dimmed(), "yes".green());
-        }
 
         if !api.functions.is_empty() {
             println!("    {}", "functions:".dimmed());
