@@ -94,10 +94,13 @@ impl Loader {
                         unique_comps.dedup();
                         for comp_fn in unique_comps {
                             let escaped_comp = sq_escape(comp_fn);
-                            out.push_str(&format!("{}() {{\n", escaped_comp));
-                            out.push_str(&format!("  {}\n", loader_fn));
-                            out.push_str(&format!("  '{}' \"$@\"\n", escaped_comp));
-                            out.push_str("}\n");
+                            out.push_str(&format!("if ! type '{}' &>/dev/null; then\n", escaped_comp));
+                            out.push_str(&format!("  {}() {{\n", escaped_comp));
+                            out.push_str(&format!("    unfunction '{}' 2>/dev/null\n", escaped_comp));
+                            out.push_str(&format!("    {}\n", loader_fn));
+                            out.push_str(&format!("    '{}' \"$@\"\n", escaped_comp));
+                            out.push_str("  }\n");
+                            out.push_str("fi\n");
                         }
                     } else {
                         out.push_str(&format!(
@@ -150,6 +153,8 @@ impl Loader {
                 all_funcs.extend(m.manifest.api.functions.iter().cloned());
                 all_vars.extend(m.manifest.api.variables.iter().cloned());
                 all_aliases.extend(m.manifest.api.aliases.keys().cloned());
+                // Deferred aliases are generated as functions, so we must also unset them as functions
+                all_funcs.extend(m.manifest.api.aliases.keys().cloned());
             }
         }
 
@@ -192,9 +197,12 @@ fn generate_module_reset_fn(m: &DiscoveredModule) -> Option<String> {
     let mut out = String::new();
     out.push_str(&format!("_gai_reset_{}() {{\n", m.manifest.module.name));
 
-    if !api.functions.is_empty() {
-        let quoted = api
-            .functions
+    let mut funcs_to_unset = api.functions.clone();
+    // Deferred aliases are generated as functions, so we must also unset them as functions
+    funcs_to_unset.extend(api.aliases.keys().cloned());
+
+    if !funcs_to_unset.is_empty() {
+        let quoted = funcs_to_unset
             .iter()
             .map(|f| format!("'{}'", sq_escape(f)))
             .collect::<Vec<_>>()
