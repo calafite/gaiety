@@ -29,100 +29,180 @@ impl Loader {
         out.push_str("\n# --- Load Modules ---\n");
         let mut all_completions = Vec::new();
 
+        // Group loaded modules into dependency stages
+        let mut stages: Vec<Vec<&DiscoveredModule>> = Vec::new();
+        let mut name_to_stage = std::collections::HashMap::new();
+
         for m in modules {
             if m.status == ModuleStatus::Loaded {
-                let init_script = m.path.join("init.zsh");
-                if init_script.exists() {
-                    if m.manifest.api.defer_on_cmd {
-                        let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
-
-                        let mut stubs_to_unfunction = Vec::new();
-                        stubs_to_unfunction.push(loader_fn.clone());
-                        for func in &m.manifest.api.functions {
-                            stubs_to_unfunction.push(func.clone());
-                        }
-                        for alias_name in m.manifest.api.aliases.keys() {
-                            stubs_to_unfunction.push(alias_name.clone());
-                        }
-                        for comp_fn in m.manifest.api.completions.values() {
-                            stubs_to_unfunction.push(comp_fn.clone());
-                        }
-
-                        let unfunction_list = stubs_to_unfunction
-                            .iter()
-                            .map(|f| format!("'{}'", sq_escape(f)))
-                            .collect::<Vec<_>>()
-                            .join(" ");
-
-                        out.push_str(&format!("{}() {{\n", loader_fn));
-                        out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
-                        out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
-
-                        for (name, expansion) in &m.manifest.api.aliases {
-                            out.push_str(&format!(
-                                "  alias '{}={}'\n",
-                                sq_escape(name),
-                                sq_escape(expansion)
-                            ));
-                        }
-                        out.push_str("}\n");
-
-                        for func in &m.manifest.api.functions {
-                            let escaped_func = sq_escape(func);
-                            out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_func));
-                            out.push_str(&format!("{}() {{\n", escaped_func));
-                            out.push_str(&format!("  {}\n", loader_fn));
-                            out.push_str(&format!("  '{}' \"$@\"\n", escaped_func));
-                            out.push_str("}\n");
-                        }
-
-                        for alias_name in m.manifest.api.aliases.keys() {
-                            let escaped_alias = sq_escape(alias_name);
-                            // unalias first: same parse issue
-                            out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_alias));
-                            out.push_str(&format!("{}() {{\n", escaped_alias));
-                            out.push_str(&format!("  {}\n", loader_fn));
-                            out.push_str(&format!("  eval '{} \"$@\"'\n", escaped_alias));
-                            out.push_str("}\n");
-                        }
-
-                        let mut unique_comps = m.manifest.api.completions.values().collect::<Vec<_>>();
-                        unique_comps.sort();
-                        unique_comps.dedup();
-                        for comp_fn in unique_comps {
-                            let escaped_comp = sq_escape(comp_fn);
-                            out.push_str(&format!("if ! type '{}' &>/dev/null; then\n", escaped_comp));
-                            // unalias inside the guard before defining
-                            out.push_str(&format!("  unalias '{}' 2>/dev/null\n", escaped_comp));
-                            out.push_str(&format!("  {}() {{\n", escaped_comp));
-                            out.push_str(&format!("    unfunction '{}' 2>/dev/null\n", escaped_comp));
-                            out.push_str(&format!("    {}\n", loader_fn));
-                            out.push_str(&format!("    '{}' \"$@\"\n", escaped_comp));
-                            out.push_str("  }\n");
-                            out.push_str("fi\n");
-                        }
-                    } else {
-                        out.push_str(&format!(
-                            "source '{}'\n",
-                            sq_escape(&init_script.display().to_string())
-                        ));
-
-                        for (name, expansion) in &m.manifest.api.aliases {
-                            out.push_str(&format!(
-                                "alias '{}={}'\n",
-                                sq_escape(name),
-                                sq_escape(expansion)
-                            ));
-                        }
+                let mut max_dep_stage = 0;
+                let mut has_deps = false;
+                for dep in &m.manifest.module.deps {
+                    if let Some(&stage_idx) = name_to_stage.get(&dep.name) {
+                        max_dep_stage = max_dep_stage.max(stage_idx);
+                        has_deps = true;
                     }
                 }
+                let stage_idx = if has_deps { max_dep_stage + 1 } else { 0 };
+                name_to_stage.insert(m.manifest.module.name.clone(), stage_idx);
 
-                for (cmd, comp_fn) in &m.manifest.api.completions {
-                    all_completions.push(format!(
-                        "compdef {} {}",
-                        sq_escape(comp_fn),
-                        sq_escape(cmd)
+                while stages.len() <= stage_idx {
+                    stages.push(Vec::new());
+                }
+                stages[stage_idx].push(m);
+            }
+        }
+
+        let has_concurrent_candidates = stages.iter().any(|stage| {
+            stage.iter().filter(|m| !m.manifest.api.defer_on_cmd).count() > 1
+        });
+
+        if has_concurrent_candidates {
+            out.push_str("_GAI_TMP=$(mktemp -d)\n");
+            out.push_str("_gai_cleanup() {\n  rm -rf \"$_GAI_TMP\"\n}\n");
+            out.push_str("trap _gai_cleanup EXIT\n\n");
+        }
+
+        for (stage_idx, stage) in stages.iter().enumerate() {
+            let non_deferred: Vec<_> = stage
+                .iter()
+                .filter(|m| !m.manifest.api.defer_on_cmd && m.path.join("init.zsh").exists())
+                .collect();
+
+            let deferred: Vec<_> = stage
+                .iter()
+                .filter(|m| m.manifest.api.defer_on_cmd && m.path.join("init.zsh").exists())
+                .collect();
+
+            // Process deferred modules sequentially (defining stubs is instant)
+            for m in deferred {
+                let init_script = m.path.join("init.zsh");
+                let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
+
+                let mut stubs_to_unfunction = Vec::new();
+                stubs_to_unfunction.push(loader_fn.clone());
+                for func in &m.manifest.api.functions {
+                    stubs_to_unfunction.push(func.clone());
+                }
+                for alias_name in m.manifest.api.aliases.keys() {
+                    stubs_to_unfunction.push(alias_name.clone());
+                }
+                for comp_fn in m.manifest.api.completions.values() {
+                    stubs_to_unfunction.push(comp_fn.clone());
+                }
+
+                let unfunction_list = stubs_to_unfunction
+                    .iter()
+                    .map(|f| format!("'{}'", sq_escape(f)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                out.push_str(&format!("{}() {{\n", loader_fn));
+                out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
+                out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
+
+                for (name, expansion) in &m.manifest.api.aliases {
+                    out.push_str(&format!(
+                        "  alias '{}={}'\n",
+                        sq_escape(name),
+                        sq_escape(expansion)
                     ));
+                }
+                out.push_str("}\n");
+
+                for func in &m.manifest.api.functions {
+                    let escaped_func = sq_escape(func);
+                    out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_func));
+                    out.push_str(&format!("{}() {{\n", escaped_func));
+                    out.push_str(&format!("  {}\n", loader_fn));
+                    out.push_str(&format!("  '{}' \"$@\"\n", escaped_func));
+                    out.push_str("}\n");
+                }
+
+                for alias_name in m.manifest.api.aliases.keys() {
+                    let escaped_alias = sq_escape(alias_name);
+                    out.push_str(&format!("unalias '{}' 2>/dev/null\n", escaped_alias));
+                    out.push_str(&format!("{}() {{\n", escaped_alias));
+                    out.push_str(&format!("  {}\n", loader_fn));
+                    out.push_str(&format!("  eval '{} \"$@\"'\n", escaped_alias));
+                    out.push_str("}\n");
+                }
+
+                let mut unique_comps = m.manifest.api.completions.values().collect::<Vec<_>>();
+                unique_comps.sort();
+                unique_comps.dedup();
+                for comp_fn in unique_comps {
+                    let escaped_comp = sq_escape(comp_fn);
+                    out.push_str(&format!("if ! type '{}' &>/dev/null; then\n", escaped_comp));
+                    out.push_str(&format!("  unalias '{}' 2>/dev/null\n", escaped_comp));
+                    out.push_str(&format!("  {}() {{\n", escaped_comp));
+                    out.push_str(&format!("    unfunction '{}' 2>/dev/null\n", escaped_comp));
+                    out.push_str(&format!("    {}\n", loader_fn));
+                    out.push_str(&format!("    '{}' \"$@\"\n", escaped_comp));
+                    out.push_str("  }\n");
+                    out.push_str("fi\n");
+                }
+            }
+
+            // Process non-deferred modules
+            if non_deferred.len() > 1 {
+                out.push_str(&format!("# --- Stage {} (Concurrent) ---\n", stage_idx));
+                let mut pids = Vec::new();
+                for (i, m) in non_deferred.iter().enumerate() {
+                    let init_script = m.path.join("init.zsh");
+                    let out_file = format!("\"$_GAI_TMP/s{}_{}\"", stage_idx, i);
+                    out.push_str("(\n");
+                    out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
+                    out.push_str("  typeset -f\n");
+                    out.push_str("  alias -L\n");
+                    if !m.manifest.api.variables.is_empty() {
+                        let vars = m.manifest.api.variables
+                            .iter()
+                            .map(|v| format!("'{}'", sq_escape(v)))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        out.push_str(&format!("  typeset -p {} 2>/dev/null\n", vars));
+                    }
+                    out.push_str(&format!(") > {} &\n", out_file));
+                    out.push_str(&format!("_gai_pid_{}_{}=$!\n", stage_idx, i));
+                    pids.push(format!("$_gai_pid_{}_{}", stage_idx, i));
+                }
+                out.push_str(&format!("wait {} 2>/dev/null\n", pids.join(" ")));
+                for (i, m) in non_deferred.iter().enumerate() {
+                    let out_file = format!("\"$_GAI_TMP/s{}_{}\"", stage_idx, i);
+                    out.push_str(&format!("[[ -f {} ]] && source {}\n", out_file, out_file));
+                    for (name, expansion) in &m.manifest.api.aliases {
+                        out.push_str(&format!(
+                            "alias '{}={}'\n",
+                            sq_escape(name),
+                            sq_escape(expansion)
+                        ));
+                    }
+                }
+            } else if let Some(m) = non_deferred.first() {
+                let init_script = m.path.join("init.zsh");
+                out.push_str(&format!(
+                    "source '{}'\n",
+                    sq_escape(&init_script.display().to_string())
+                ));
+                for (name, expansion) in &m.manifest.api.aliases {
+                    out.push_str(&format!(
+                        "alias '{}={}'\n",
+                        sq_escape(name),
+                        sq_escape(expansion)
+                    ));
+                }
+            }
+
+            for m in stage {
+                if m.status == ModuleStatus::Loaded {
+                    for (cmd, comp_fn) in &m.manifest.api.completions {
+                        all_completions.push(format!(
+                            "compdef {} {}",
+                            sq_escape(comp_fn),
+                            sq_escape(cmd)
+                        ));
+                    }
                 }
             }
         }
