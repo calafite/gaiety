@@ -1,5 +1,6 @@
-use crate::loader::types::ModuleStatus;
-use crate::loader::Loader;
+use crate::core::types::ModuleStatus;
+use crate::core::Loader;
+use crate::validator::check_completions;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use std::fs;
@@ -27,7 +28,7 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    for warning in loader.check_completions(&modules) {
+    for warning in check_completions(&modules) {
         eprintln!("{} {}", "warn:".bold().yellow(), warning);
     }
 
@@ -79,7 +80,7 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
-fn zcompile_parallel(modules: &[crate::loader::types::DiscoveredModule], cache_path: &Path) {
+fn zcompile_parallel(modules: &[crate::core::types::DiscoveredModule], cache_path: &Path) {
     let mut script = String::new();
 
     for m in modules {

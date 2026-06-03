@@ -1,5 +1,5 @@
-use crate::loader::types::ModuleStatus;
-use crate::loader::Loader;
+use crate::core::types::ModuleStatus;
+use crate::core::Loader;
 use anyhow::{bail, Result};
 use colored::Colorize;
 
@@ -175,10 +175,10 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
             src.url.dimmed()
         );
         if let Some(ref b) = src.branch {
-            println!("    {:<10} {}", "branch:".dimmed(), b.as_str().dimmed());
+            println!("    {:<10} {}", "branch:".dimmed(), b.dimmed());
         }
         if let Some(ref p) = src.pin {
-            println!("    {:<10} {}", "pin:".dimmed(), p.as_str().dimmed());
+            println!("    {:<10} {}", "pin:".dimmed(), p.dimmed());
         }
         println!(
             "    {:<10} {}",

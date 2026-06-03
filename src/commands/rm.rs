@@ -1,4 +1,4 @@
-use crate::loader::Loader;
+use crate::core::Loader;
 use anyhow::{bail, Result};
 use colored::Colorize;
 use std::fs;

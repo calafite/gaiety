@@ -1,5 +1,5 @@
 use crate::commands::install::head_commit;
-use crate::loader::Loader;
+use crate::core::Loader;
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
 use std::fs;
@@ -67,7 +67,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
 
         if let Some(ref b) = src.branch {
             args.push("origin".to_string());
-            args.push(b.to_string());
+            args.push(b.clone());
         }
 
         let output = Command::new("git").args(&args).output();

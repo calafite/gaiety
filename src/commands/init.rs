@@ -1,4 +1,5 @@
-use crate::loader::Loader;
+use crate::core::Loader;
+use crate::validator::check_completions;
 use anyhow::Result;
 use colored::Colorize;
 
@@ -6,7 +7,7 @@ pub fn run(dirs: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    for warning in loader.check_completions(&modules) {
+    for warning in check_completions(&modules) {
         eprintln!("{} {}", "warn:".bold().yellow(), warning);
     }
 

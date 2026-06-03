@@ -1,4 +1,5 @@
-use crate::loader::Loader;
+use crate::commands::install::is_valid_name;
+use crate::core::Loader;
 use anyhow::{bail, Result};
 use colored::Colorize;
 use std::fs;
@@ -66,21 +67,9 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
     Ok(())
 }
 
-fn is_valid_name(name: &str) -> bool {
-    if name.is_empty() {
-        return false;
-    }
-    let mut chars = name.chars();
-    match chars.next() {
-        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
-        _ => return false,
-    }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::commands::install::is_valid_name;
 
     #[test]
     fn test_is_valid_name() {

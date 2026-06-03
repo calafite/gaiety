@@ -1,5 +1,5 @@
-use crate::loader::types::ModuleStatus;
-use crate::loader::Loader;
+use crate::core::types::ModuleStatus;
+use crate::core::Loader;
 use anyhow::Result;
 use colored::Colorize;
 
@@ -51,9 +51,15 @@ pub fn run(dirs: String) -> Result<()> {
         let deps_colored = format!("deps:{:<22}", deps).dimmed();
         let file_colored = m.path.file_name().unwrap().to_string_lossy().dimmed();
 
+        let managed_tag = if m.manifest.source.is_some() {
+            " [src]".cyan().to_string()
+        } else {
+            String::new()
+        };
+
         println!(
-            "  {}  {}  {}  {}  {}",
-            name_colored, status_colored, version_colored, deps_colored, file_colored
+            "  {}  {}  {}  {}  {}{}",
+            name_colored, status_colored, version_colored, deps_colored, file_colored, managed_tag
         );
 
         match &m.status {

@@ -1,5 +1,5 @@
-use crate::loader::types::ModuleStatus;
-use crate::loader::Loader;
+use crate::core::types::ModuleStatus;
+use crate::core::Loader;
 use anyhow::{bail, Result};
 use std::io::Write;
 use std::process::{Command, Stdio};

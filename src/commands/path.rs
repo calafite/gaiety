@@ -1,4 +1,4 @@
-use crate::loader::Loader;
+use crate::core::Loader;
 use anyhow::{bail, Result};
 
 pub fn run(dirs: String, module_name: String) -> Result<()> {
