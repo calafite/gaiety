@@ -78,7 +78,7 @@ pub fn run(
                 "warn:".bold().yellow()
             );
         }
-        install_collection(&tmp_dir, &collection_dirs, &parsed, &source_block, &modules, &write_dir, &loader)
+        install_collection(&collection_dirs, &parsed, &source_block, &modules, &write_dir, &loader)
     };
 
     let _ = fs::remove_dir_all(&tmp_dir);
@@ -204,7 +204,6 @@ fn install_single(
 }
 
 fn install_collection(
-    tmp_dir: &Path,
     collection_dirs: &[PathBuf],
     parsed: &ParsedSpec,
     source_block: &str,
