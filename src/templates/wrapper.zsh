@@ -60,21 +60,37 @@ gai() {
             {{GAIETY_BIN}} "$@"
             ;;
         *)
-            echo "Usage: gai <command> [args]"
+            local c="\033[1;36m"   # bold cyan  — header / command names
+            local g="\033[0;32m"   # green      — arguments
+            local d="\033[2m"      # dim        — descriptions
+            local b="\033[1;34m"   # bold blue  — hint prefix
+            local r="\033[0m"      # reset
+
             echo ""
-            echo "Commands:"
-            echo "  reload [<name>]            Reload all modules, or just <name>"
-            echo "  sync                       Write the init script to the cache file"
-            echo "  browse                     Browse modules interactively (requires fzf)"
-            echo "  list                       List all modules and their status"
-            echo "  info <name>                Show metadata and public API for a module"
-            echo "  path <name>                Print the path to a module's init.zsh"
-            echo "  new <name>                 Scaffold a new module"
-            echo "  install <spec>             Install a module from a git repository"
-            echo "  update [<name>]            Update installed module(s)"
-            echo "  rm <name>                  Remove a module"
-            echo "  rename <old> <new>         Rename a module"
-            echo "  profile                    Benchmark module load times"
+            echo "  ${c}:: Gaiety${r}  ${d}Zsh Runtime Module Loader${r}"
+            echo ""
+            echo "  ${d}Usage:${r}  ${c}gai${r} ${g}<command>${r} ${d}[args]${r}"
+            echo ""
+            echo "  ${d}Module management${r}"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "list"                "List all modules and their status"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "info <name>"         "Show metadata and public API"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "new <name>"          "Scaffold a new module"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "rename <old> <new>"  "Rename a module and update dependents"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "rm <name>"           "Remove a module"
+            echo ""
+            echo "  ${d}Remote packages${r}"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "install <spec>"      "Install from a git repository"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "update [<name>]"     "Pull updates for installed module(s)"
+            echo ""
+            echo "  ${d}Runtime${r}"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "reload [<name>]"     "Reload all modules, or just <name>"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "sync"                "Write the init script to the cache file"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "browse"              "Browse modules interactively (requires fzf)"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "profile"             "Benchmark module load times"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "path <name>"         "Print the path to a module's init.zsh"
+            echo ""
+            echo "  ${b}=>${r}  ${d}Set \$GAI_DIRS to a colon-separated list of module directories.${r}"
+            echo ""
             ;;
     esac
 }
