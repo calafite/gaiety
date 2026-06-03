@@ -151,14 +151,12 @@ impl Loader {
             }
 
             for m in stage {
-                if m.status == ModuleStatus::Loaded {
-                    for (cmd, comp_fn) in &m.manifest.api.completions {
-                        all_completions.push(format!(
-                            "compdef {} {}",
-                            sq_escape(comp_fn),
-                            sq_escape(cmd)
-                        ));
-                    }
+                for (cmd, comp_fn) in &m.manifest.api.completions {
+                    all_completions.push(format!(
+                        "compdef {} {}",
+                        sq_escape(comp_fn),
+                        sq_escape(cmd)
+                    ));
                 }
             }
         }
