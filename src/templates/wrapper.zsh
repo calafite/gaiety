@@ -43,11 +43,24 @@ gai() {
 
             gai reload "$name" "$mod_path"
             ;;
+        install)
+            gaiety "$@" || return $?
+            echo ""
+            echo "\033[1m\033[34m=> \033[0m\033[2mRun 'gai reload' to load the new module now.\033[0m"
+            ;;
+        update)
+            gaiety "$@"
+            local _gai_exit=$?
+            if [[ $_gai_exit -eq 0 ]]; then
+                echo "\033[1m\033[34m=> \033[0m\033[2mRun 'gai reload' to apply any updates.\033[0m"
+            fi
+            return $_gai_exit
+            ;;
         list|info|new|rm|rename|profile|path)
             gaiety "$@"
             ;;
         *)
-            echo "Usage: gai [reload [<name>]|sync|browse|list|info <name>|new <name>|rm <name>|rename <old> <new>|profile|path <name>]"
+            echo "Usage: gai [reload [<name>]|sync|browse|list|info <name>|new <name>|install <spec>|update [<name>]|rm <name>|rename <old> <new>|profile|path <name>]"
             ;;
     esac
 }
