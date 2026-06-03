@@ -1,4 +1,4 @@
-use crate::commands::{browse, info, init, list, new, path, profile, rename, rm, sync};
+use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update};
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::{Parser, Subcommand};
@@ -20,7 +20,6 @@ fn styles() -> Styles {
     styles = styles()
 )]
 pub struct Cli {
-    /// Colon-separated list of module directories
     #[arg(short, long, global = true, env = "GAI_DIRS", default_value = ".")]
     pub dirs: String,
 
@@ -30,52 +29,59 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Generate and emit the Zsh initialization script to stdout
     Init,
-    /// Write the init script to a cache file for zero-latency shell startup
+
     Sync {
-        /// Override the output path (default: see above)
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    /// Browse modules interactively (requires fzf)
+
     Browse,
-    /// List all modules and their current status
+
     List,
-    /// View detailed metadata and API for a module
+
     Info {
-        /// Name of the module
         module: String,
     },
-    /// Print the path to a module's init.zsh (used internally by gai reload <name>)
+
     Path {
-        /// Name of the module
         module: String,
     },
-    /// Create a new module from templates
-    New {
-        /// Name of the new module
-        module: String,
-        /// Directory to create the module in (defaults to the last in GAI_DIRS)
+
+    Install {
+        spec: String,
+
+        #[arg(short, long)]
+        name: Option<String>,
+
+        #[arg(short, long)]
+        branch: Option<String>,
+
         #[arg(short, long)]
         target: Option<PathBuf>,
     },
-    /// Remove a module and renumber remaining modules in its directory
-    Rm {
-        /// Name of the module to remove
+
+    Update {
+        module: Option<String>,
+    },
+
+    New {
         module: String,
-        /// Only remove the module if it lives in this directory
+        #[arg(short, long)]
+        target: Option<PathBuf>,
+    },
+
+    Rm {
+        module: String,
         #[arg(short, long)]
         dir: Option<PathBuf>,
     },
-    /// Rename a module
+
     Rename {
-        /// Current module name
         old: String,
-        /// New module name
         new: String,
     },
-    /// Benchmark the exact load time of every module
+
     Profile,
 }
 
@@ -87,6 +93,10 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
         Commands::Path { module } => path::run(cli.dirs, module),
+        Commands::Install { spec, name, branch, target } => {
+            install::run(cli.dirs, spec, name, branch, target)
+        }
+        Commands::Update { module } => update::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm { module, dir } => rm::run(cli.dirs, module, dir),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),

@@ -61,7 +61,6 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
             continue;
         }
 
-        // Build: git -C <path> pull --ff-only [--rebase=false]
         let path_str = m.path.to_string_lossy().into_owned();
         let mut args = vec!["-C".to_string(), path_str, "pull".to_string()];
 
@@ -82,7 +81,6 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                     println!("{}", "up to date".dimmed());
                     already_current += 1;
                 } else {
-                    // Update the pin in module.toml to reflect the new HEAD.
                     let new_pin = head_commit(&m.path);
                     if let Some(ref p) = new_pin {
                         let _ = update_pin_in_toml(&m.path.join("module.toml"), p);

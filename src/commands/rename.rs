@@ -80,7 +80,7 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     }
     println!();
 
-    let mut dep_temps: Vec<(PathBuf, PathBuf)> = Vec::new(); // (tmp, target)
+    let mut dep_temps: Vec<(PathBuf, PathBuf)> = Vec::new();
     let mut dep_temp_guard = TempFilesGuard::new();
 
     for (_, target_path, updated) in &dependent_rewrites {
@@ -128,8 +128,6 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
     Ok(())
 }
 
-//guards
-//
 struct TempDirGuard {
     path: PathBuf,
     active: bool,
@@ -184,8 +182,6 @@ impl Drop for TempFilesGuard {
         }
     }
 }
-
-//helpers
 
 fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir(dst)

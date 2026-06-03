@@ -29,7 +29,6 @@ impl Loader {
         out.push_str("\n# --- Load Modules ---\n");
         let mut all_completions = Vec::new();
 
-        // Group loaded modules into dependency stages
         let mut stages: Vec<Vec<&DiscoveredModule>> = Vec::new();
         let mut name_to_stage = std::collections::HashMap::new();
 
@@ -64,7 +63,6 @@ impl Loader {
                 .filter(|m| m.manifest.api.defer_on_cmd && m.path.join("init.zsh").exists())
                 .collect();
 
-            // Process deferred modules sequentially (defining stubs is instant)
             for m in deferred {
                 let init_script = m.path.join("init.zsh");
                 let loader_fn = format!("_gai_load_deferred_{}", m.manifest.module.name);
@@ -134,7 +132,6 @@ impl Loader {
                 }
             }
 
-            // Process non-deferred modules sequentially.
             if !non_deferred.is_empty() {
                 out.push_str(&format!("# --- Stage {} ---\n", stage_idx));
                 for m in non_deferred {

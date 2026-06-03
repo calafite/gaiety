@@ -177,12 +177,6 @@ struct ParsedSpec {
     branch: Option<String>,
 }
 
-/// Accepted formats:
-///   user/repo                   → https://github.com/user/repo.git
-///   user/repo@branch            → …with branch
-///   github:user/repo            → same as user/repo
-///   gitlab:user/repo            → https://gitlab.com/…
-///   https://host/user/repo.git  → verbatim
 fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec> { 
     let (base, inline_branch) =
         if !spec.starts_with("http://") && !spec.starts_with("https://") {
@@ -214,7 +208,6 @@ fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec>
             let name = last_segment(path);
             (format!("https://gitlab.com/{}", path), name)
         } else if base.contains('/') {
-            // Default shorthand → GitHub
             let name = last_segment(base);
             (format!("https://github.com/{}", base), name)
         } else {
@@ -250,7 +243,6 @@ pub fn repo_to_module_name(repo_name: &str) -> String {
         .collect::<String>()
         .to_lowercase();
 
-    // Must not start with a digit.
     if s.starts_with(|c: char| c.is_ascii_digit()) {
         format!("_{}", s)
     } else {

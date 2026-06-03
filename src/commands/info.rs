@@ -125,7 +125,6 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     println!();
 
-    // ── Public API ────────────────────────────────────────────────────────────
     let api = &m.manifest.api;
     let has_api =
         !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
