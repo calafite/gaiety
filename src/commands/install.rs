@@ -19,6 +19,81 @@ pub fn run(
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
+    let write_dir = target.as_ref().unwrap_or_else(|| loader.default_write_dir()).clone();
+
+    let tmp_name = format!(".gai_install_tmp_{}", std::process::id());
+    let tmp_dir = write_dir.join(&tmp_name);
+
+    if tmp_dir.exists() {
+        fs::remove_dir_all(&tmp_dir)
+            .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
+    }
+
+    println!("\n{} {}\n", "::".bold().cyan(), "Install Package".bold().cyan());
+    println!("  {:<12} {}", "source:".dimmed(), parsed.url.dimmed());
+    if let Some(ref b) = parsed.branch {
+        println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
+    }
+
+    let mut clone_args: Vec<String> = vec!["clone".into(), "--depth=1".into()];
+    if let Some(ref b) = parsed.branch {
+        clone_args.push("--branch".into());
+        clone_args.push(b.clone());
+    }
+    clone_args.push(parsed.url.clone());
+    clone_args.push(tmp_dir.to_string_lossy().into_owned());
+
+    let status = Command::new("git")
+        .args(&clone_args)
+        .status()
+        .context("Failed to run git")?;
+
+    if !status.success() {
+        if tmp_dir.exists() {
+            let _ = fs::remove_dir_all(&tmp_dir);
+        }
+        bail!("git clone failed — see output above");
+    }
+
+    let pin = head_commit(&tmp_dir);
+    let source_block = build_source_block(&parsed, pin.as_deref());
+
+    let collection_dirs = detect_collection(&tmp_dir);
+    let is_single = tmp_dir.join("module.toml").exists();
+
+    let result = if is_single || collection_dirs.is_empty() {
+        install_single(
+            &tmp_dir,
+            &parsed,
+            &source_block,
+            &modules,
+            &write_dir,
+            &loader,
+            name_override,
+        )
+    } else {
+        if name_override.is_some() {
+            eprintln!(
+                "{} --name is ignored for collection repositories; module names come from each module.toml",
+                "warn:".bold().yellow()
+            );
+        }
+        install_collection(&tmp_dir, &collection_dirs, &parsed, &source_block, &modules, &write_dir, &loader)
+    };
+
+    let _ = fs::remove_dir_all(&tmp_dir);
+    result
+}
+
+fn install_single(
+    tmp_dir: &Path,
+    parsed: &ParsedSpec,
+    source_block: &str,
+    modules: &[crate::core::types::DiscoveredModule],
+    write_dir: &Path,
+    loader: &crate::core::Loader,
+    name_override: Option<String>,
+) -> Result<()> {
     let module_name = name_override.unwrap_or_else(|| repo_to_module_name(&parsed.repo_name));
 
     if !is_valid_name(&module_name) {
@@ -35,72 +110,30 @@ pub fn run(
         );
     }
 
-    let write_dir = target.as_ref().unwrap_or_else(|| loader.default_write_dir());
     let write_dir_index = loader.dirs.iter().position(|d| d == write_dir);
-
-    let max_prefix = modules
-        .iter()
-        .filter(|m| match write_dir_index {
-            Some(idx) => m.dir_index == idx,
-            None => m.path.parent().map_or(false, |p| p == write_dir.as_path()),
-        })
-        .filter_map(|m| m.prefix_order)
-        .max()
-        .unwrap_or(0);
-
-    let dir_name = format!("{:02}_{}", max_prefix + 1, module_name);
+    let max_prefix = next_prefix(modules, write_dir_index, write_dir);
+    let dir_name = format!("{:02}_{}", max_prefix, module_name);
     let module_dir = write_dir.join(&dir_name);
 
     if module_dir.exists() {
         bail!("Directory already exists: {}", module_dir.display());
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Install Package".bold().cyan());
-    println!("  {:<12} {}", "source:".dimmed(), parsed.url.dimmed());
-    if let Some(ref b) = parsed.branch {
-        println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
-    }
     println!("  {:<12} {}", "module:".dimmed(), module_name.green());
-    println!(
-        "  {:<12} {}\n",
-        "dest:".dimmed(),
-        module_dir.display().to_string().dimmed()
-    );
+    println!("  {:<12} {}\n", "dest:".dimmed(), module_dir.display().to_string().dimmed());
 
-    let mut clone_args: Vec<String> = vec!["clone".into(), "--depth=1".into()];
-    if let Some(ref b) = parsed.branch {
-        clone_args.push("--branch".into());
-        clone_args.push(b.clone());
-    }
-    clone_args.push(parsed.url.clone());
-    clone_args.push(module_dir.to_string_lossy().into_owned());
-
-    let status = Command::new("git")
-        .args(&clone_args)
-        .status()
-        .context("Failed to run git")?;
-
-    if !status.success() {
-        if module_dir.exists() {
-            let _ = fs::remove_dir_all(&module_dir);
-        }
-        bail!("git clone failed — see output above");
-    }
-
-    let pin = head_commit(&module_dir);
+    copy_dir(tmp_dir, &module_dir)?;
 
     let has_toml = module_dir.join("module.toml").exists();
     let has_init = module_dir.join("init.zsh").exists();
- 
+
     let final_name = if has_toml {
         read_toml_name(&module_dir.join("module.toml")).unwrap_or_else(|_| module_name.clone())
     } else {
         module_name.clone()
     };
 
-    let source_block = build_source_block(&parsed, pin.as_deref());
-
-    if has_toml { 
+    if has_toml {
         let toml_path = module_dir.join("module.toml");
         let existing = fs::read_to_string(&toml_path)?;
         if !existing.contains("[source]") {
@@ -151,11 +184,10 @@ pub fn run(
         };
         fs::write(module_dir.join("init.zsh"), &init_content)?;
 
-        if !init_content.contains("source \"${0:h}/") || init_content.contains("TODO") {
+        if init_content.contains("TODO") {
             eprintln!(
-                "{} Could not auto-detect the main plugin file.\n  Edit {}/{}/init.zsh before running 'gai reload'.",
+                "{} Could not auto-detect the main plugin file.\n  Edit {}/init.zsh before running 'gai reload'.",
                 "warn:".bold().yellow(),
-                write_dir.display(),
                 dir_name,
             );
         }
@@ -171,13 +203,165 @@ pub fn run(
     Ok(())
 }
 
+fn install_collection(
+    tmp_dir: &Path,
+    collection_dirs: &[PathBuf],
+    parsed: &ParsedSpec,
+    source_block: &str,
+    modules: &[crate::core::types::DiscoveredModule],
+    write_dir: &Path,
+    loader: &crate::core::Loader,
+) -> Result<()> {
+    println!(
+        "  {:<12} {}\n",
+        "collection:".dimmed(),
+        format!("{} modules detected", collection_dirs.len()).cyan()
+    );
+
+    let mut incoming: Vec<(String, &Path)> = Vec::new();
+    for subdir in collection_dirs {
+        let name = read_toml_name(&subdir.join("module.toml"))
+            .with_context(|| format!("Failed to read module name from {}", subdir.display()))?;
+
+        if !is_valid_name(&name) {
+            bail!(
+                "Module name '{}' in {} is not valid (must match [a-zA-Z_][a-zA-Z0-9_]*).",
+                name,
+                subdir.display()
+            );
+        }
+
+        if modules.iter().any(|m| m.manifest.module.name == name) {
+            bail!(
+                "Module '{}' already exists. Remove it with 'gai rm {}' before reinstalling.",
+                name, name
+            );
+        }
+
+        let dupe = incoming.iter().find(|(n, _)| n == &name);
+        if let Some((_, other)) = dupe {
+            bail!(
+                "Duplicate module name '{}' found in both {} and {}.",
+                name,
+                other.display(),
+                subdir.display()
+            );
+        }
+
+        incoming.push((name, subdir));
+    }
+
+    let write_dir_index = loader.dirs.iter().position(|d| d == write_dir);
+    let mut prefix = next_prefix(modules, write_dir_index, write_dir);
+
+    let col_w = incoming.iter().map(|(n, _)| n.len()).max().unwrap_or(12).max(12);
+
+    let mut installed: Vec<String> = Vec::new();
+
+    for (name, subdir) in &incoming {
+        let dir_name = format!("{:02}_{}", prefix, name);
+        let module_dir = write_dir.join(&dir_name);
+
+        if module_dir.exists() {
+            bail!("Directory already exists: {}", module_dir.display());
+        }
+
+        copy_dir(subdir, &module_dir)?;
+
+        let toml_path = module_dir.join("module.toml");
+        let existing = fs::read_to_string(&toml_path)
+            .with_context(|| format!("Failed to read {}", toml_path.display()))?;
+        if !existing.contains("[source]") {
+            fs::write(&toml_path, format!("{}\n{}", existing.trim_end(), source_block))
+                .with_context(|| format!("Failed to write {}", toml_path.display()))?;
+        }
+
+        println!(
+            "  {}  {}",
+            format!("{:<width$}", name.green(), width = col_w),
+            dir_name.dimmed()
+        );
+
+        installed.push(name.clone());
+        prefix += 1;
+    }
+
+    println!();
+    println!(
+        "{} installed {} module(s) from '{}'\n",
+        "✓".bold().green(),
+        installed.len(),
+        parsed.repo_name
+    );
+    println!(
+        "{} Run {} to activate in your current session\n",
+        "=>".bold().blue(),
+        "gai reload".bold()
+    );
+
+    Ok(())
+}
+
+fn detect_collection(dir: &Path) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.is_dir()
+                && p.join("module.toml").exists()
+                && p.join("init.zsh").exists()
+        })
+        .collect();
+    dirs.sort();
+    dirs
+}
+
+fn next_prefix(
+    modules: &[crate::core::types::DiscoveredModule],
+    write_dir_index: Option<usize>,
+    write_dir: &Path,
+) -> u32 {
+    modules
+        .iter()
+        .filter(|m| match write_dir_index {
+            Some(idx) => m.dir_index == idx,
+            None => m.path.parent().map_or(false, |p| p == write_dir),
+        })
+        .filter_map(|m| m.prefix_order)
+        .max()
+        .unwrap_or(0)
+        + 1
+}
+
+fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir(dst)
+        .with_context(|| format!("Failed to create dir: {}", dst.display()))?;
+    for entry in fs::read_dir(src)
+        .with_context(|| format!("Failed to read dir: {}", src.display()))?
+    {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path).with_context(|| {
+                format!("Failed to copy {} → {}", src_path.display(), dst_path.display())
+            })?;
+        }
+    }
+    Ok(())
+}
+
 struct ParsedSpec {
-    url: String, 
+    url: String,
     repo_name: String,
     branch: Option<String>,
 }
 
-fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec> { 
+fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec> {
     let (base, inline_branch) =
         if !spec.starts_with("http://") && !spec.starts_with("https://") {
             if let Some(pos) = spec.rfind('@') {
@@ -224,7 +408,6 @@ fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec>
         };
 
     let url = format!("{}.git", raw_url.trim_end_matches(".git"));
-
     Ok(ParsedSpec { url, repo_name, branch })
 }
 
@@ -262,19 +445,6 @@ pub fn is_valid_name(name: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-fn require_git() -> Result<()> {
-    if Command::new("git")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_err()
-    {
-        bail!("git not found in PATH — required for gai install");
-    }
-    Ok(())
-}
-
 pub fn head_commit(dir: &Path) -> Option<String> {
     Command::new("git")
         .args(["-C", &dir.to_string_lossy(), "rev-parse", "--short", "HEAD"])
@@ -305,6 +475,19 @@ fn read_toml_name(path: &Path) -> Result<String> {
         .as_str()
         .map(String::from)
         .ok_or_else(|| anyhow::anyhow!("name field not found"))
+}
+
+fn require_git() -> Result<()> {
+    if Command::new("git")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_err()
+    {
+        bail!("git not found in PATH — required for gai install");
+    }
+    Ok(())
 }
 
 fn detect_main_file(dir: &Path, repo_name: &str) -> Option<String> {
@@ -340,7 +523,6 @@ fn read_filenames(dir: &Path) -> impl Iterator<Item = String> {
         .filter(|e| e.path().is_file())
         .map(|e| e.file_name().to_string_lossy().into_owned())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -398,5 +580,36 @@ mod tests {
         assert!(!is_valid_name("123bad"));
         assert!(!is_valid_name("has-dash"));
         assert!(!is_valid_name(""));
+    }
+
+    #[test]
+    fn test_detect_collection() {
+        let tmp = std::env::temp_dir().join(format!(
+            "gai_test_collect_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+        ));
+        fs::create_dir_all(&tmp).unwrap();
+
+        for name in &["alpha", "beta"] {
+            let d = tmp.join(name);
+            fs::create_dir_all(&d).unwrap();
+            fs::write(d.join("module.toml"), format!("[module]\nname=\"{}\"\nversion=\"1.0.0\"", name)).unwrap();
+            fs::write(d.join("init.zsh"), "").unwrap();
+        }
+
+        fs::create_dir_all(tmp.join("not_a_module")).unwrap();
+
+        let found = detect_collection(&tmp);
+        assert_eq!(found.len(), 2);
+        let names: Vec<_> = found.iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"alpha".to_string()));
+        assert!(names.contains(&"beta".to_string()));
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 }
