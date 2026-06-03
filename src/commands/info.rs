@@ -125,6 +125,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
 
     println!();
 
+    // ── Public API ────────────────────────────────────────────────────────────
     let api = &m.manifest.api;
     let has_api =
         !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
@@ -162,6 +163,27 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
             "  {}  {}",
             "Public API".bold().cyan(),
             "(none registered)".dimmed()
+        );
+    }
+
+    if let Some(ref src) = m.manifest.source {
+        println!();
+        println!("  {}", "Source".bold().cyan());
+        println!(
+            "    {:<10} {}",
+            "url:".dimmed(),
+            src.url.dimmed()
+        );
+        if let Some(ref b) = src.branch {
+            println!("    {:<10} {}", "branch:".dimmed(), b.as_str().dimmed());
+        }
+        if let Some(ref p) = src.pin {
+            println!("    {:<10} {}", "pin:".dimmed(), p.as_str().dimmed());
+        }
+        println!(
+            "    {:<10} {}",
+            "update:".dimmed(),
+            format!("gai update {}", m.manifest.module.name).green()
         );
     }
 
