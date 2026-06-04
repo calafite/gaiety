@@ -12,8 +12,6 @@ toml = "*"
 toml_edit = "*"
 colored = "*"
 shellexpand = "*"
-
-
 [[bin]]
 name = "gaiety"
 path = "src/main.rs"

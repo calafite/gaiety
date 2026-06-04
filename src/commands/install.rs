@@ -51,24 +51,29 @@ pub fn install_recursive(
         println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
     }
 
-    let mut clone_args: Vec<String> = vec!["clone".into(), "--depth=1".into()];
+    let mut args = vec!["clone".to_string()];
     if let Some(ref b) = parsed.branch {
-        clone_args.push("--branch".into());
-        clone_args.push(b.clone());
+        args.push("-b".to_string());
+        args.push(b.clone());
     }
-    clone_args.push(parsed.url.clone());
-    clone_args.push(tmp_dir.to_string_lossy().into_owned());
+    args.push(parsed.url.clone());
+    args.push(tmp_dir.to_string_lossy().into_owned());
 
-    let status = Command::new("git")
-        .args(&clone_args)
-        .status()
-        .context("Failed to run git")?;
+    let clone_status = Command::new("git")
+        .args(&args)
+        .env("LC_ALL", "C")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .status();
 
-    if !status.success() {
-        if tmp_dir.exists() {
-            let _ = fs::remove_dir_all(&tmp_dir);
+    match clone_status {
+        Ok(status) if status.success() => {}
+        _ => {
+            if tmp_dir.exists() {
+                let _ = fs::remove_dir_all(&tmp_dir);
+            }
+            bail!("git clone failed");
         }
-        bail!("git clone failed — see output above");
     }
 
     let pin = head_commit(&tmp_dir);
@@ -100,13 +105,10 @@ pub fn install_recursive(
     let _ = fs::remove_dir_all(&tmp_dir);
     result?;
 
-    // Reload modules to find the newly installed module and its dependencies
     let loader = Loader::new(dirs)?;
     let updated_modules = loader.get_modules()?;
     
-    // Find the newly installed module(s) to check their dependencies
     for m in &updated_modules {
-        // We only check dependencies of loaded or newly added modules
         for dep in &m.manifest.module.deps {
             if let Some(ref dep_source) = dep.source {
                 let dep_exists = updated_modules.iter().any(|mod_item| mod_item.manifest.module.name == dep.name);
@@ -487,14 +489,22 @@ pub fn is_valid_name(name: &str) -> bool {
 }
 
 pub fn head_commit(dir: &Path) -> Option<String> {
-    Command::new("git")
-        .args(["-C", &dir.to_string_lossy(), "rev-parse", "--short", "HEAD"])
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .arg("rev-parse")
+        .arg("--short")
+        .arg("HEAD")
+        .env("LC_ALL", "C")
         .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+        .ok()?;
+    if out.status.success() {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() {
+            return Some(s);
+        }
+    }
+    None
 }
 
 fn build_source_block(parsed: &ParsedSpec, pin: Option<&str>) -> String {

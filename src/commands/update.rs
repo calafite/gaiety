@@ -65,12 +65,17 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
         let mut args = vec!["-C".to_string(), path_str, "pull".to_string()];
         if let Some(ref b) = src.branch {
             args.push("origin".to_string());
-            args.push(b.as_str().to_string());
+            args.push(b.clone());
         }
 
-        match Command::new("git").args(&args).output() {
-            Ok(out) if out.status.success() => {
-                let stdout = String::from_utf8_lossy(&out.stdout);
+        let out = Command::new("git")
+            .args(&args)
+            .env("LC_ALL", "C")
+            .output();
+
+        match out {
+            Ok(output) if output.status.success() => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains("Already up to date") || stdout.contains("Already up-to-date") {
                     println!("{}", "up to date".dimmed());
                     already_current += 1;
@@ -82,14 +87,14 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                     updated += 1;
                 }
             }
-            Ok(out) => {
-                let stderr = String::from_utf8_lossy(&out.stderr);
+            Ok(output) => {
                 println!("{}", "failed".bold().red());
-                eprintln!("    {} {}", "git:".dimmed(), stderr.trim().dimmed());
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                eprintln!("    {}", stderr.trim());
                 failed += 1;
             }
             Err(e) => {
-                println!("{}", "error".bold().red());
+                println!("{}", "failed".bold().red());
                 eprintln!("    {}", e);
                 failed += 1;
             }
@@ -114,22 +119,28 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                 .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
         }
 
-        let mut clone_args = vec!["clone".to_string(), "--depth=1".to_string()];
+        let mut args = vec!["clone".to_string()];
         if let Some(ref b) = branch {
-            clone_args.push("--branch".to_string());
-            clone_args.push(b.clone());
+            args.push("-b".to_string());
+            args.push(b.clone());
         }
-        clone_args.push(url.clone());
-        clone_args.push(tmp_dir.to_string_lossy().into_owned());
+        args.push(url.clone());
+        args.push(tmp_dir.to_string_lossy().into_owned());
 
-        let clone_status = Command::new("git").args(&clone_args).output();
+        let clone_status = Command::new("git")
+            .args(&args)
+            .env("LC_ALL", "C")
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output();
 
         let (clone_ok, new_pin) = match clone_status {
-            Ok(out) if out.status.success() => {
+            Ok(output) if output.status.success() => {
                 let pin = head_commit(&tmp_dir);
                 (true, pin)
             }
-            Ok(out) => {
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
                 for m in group {
                     let name = &m.manifest.module.name;
                     println!(
@@ -137,8 +148,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                         format!("{:<width$}", name.green(), width = col_w),
                         "clone failed".bold().red()
                     );
-                    let stderr = String::from_utf8_lossy(&out.stderr);
-                    eprintln!("    {} {}", "git:".dimmed(), stderr.trim().dimmed());
+                    eprintln!("    {}", stderr.trim());
                     failed += 1;
                 }
                 let _ = fs::remove_dir_all(&tmp_dir);
@@ -150,11 +160,12 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                     println!(
                         "  {}  {}",
                         format!("{:<width$}", name.green(), width = col_w),
-                        "error".bold().red()
+                        "clone failed".bold().red()
                     );
                     eprintln!("    {}", e);
                     failed += 1;
                 }
+                let _ = fs::remove_dir_all(&tmp_dir);
                 continue;
             }
         };
