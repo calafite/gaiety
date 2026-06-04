@@ -21,6 +21,7 @@ impl Manifest {
                 tags: Vec::new(),
                 requires_cmd: Vec::new(),
                 requires_any_cmd: Vec::new(),
+                implicit: None,
             },
             api: ApiMeta::default(),
             source: None,
@@ -50,6 +51,8 @@ pub struct ModuleMeta {
     pub requires_cmd: Vec<String>,
     #[serde(default)]
     pub requires_any_cmd: Vec<String>,
+    #[serde(default)]
+    pub implicit: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]

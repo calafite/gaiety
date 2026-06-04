@@ -149,6 +149,7 @@ fn install_single(
              tags        = []\n\
              requires_cmd     = []\n\
              requires_any_cmd = []\n\
+             implicit    = false\n\
              \n\
              [api]\n\
              functions    = []\n\

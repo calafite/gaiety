@@ -100,7 +100,13 @@ pub enum Commands {
         /// exists in multiple GAI_DIRS entries)
         #[arg(short, long)]
         dir: Option<PathBuf>,
+        /// Recursively remove dependencies that are no longer needed
+        #[arg(short, long)]
+        recursive: bool,
     },
+
+    /// Remove unused implicit dependencies
+    Prune,
 
     /// Rename a module, update its manifest, and rewrite all dependents
     Rename {
@@ -127,7 +133,8 @@ pub fn execute(cli: Cli) -> Result<()> {
         }
         Commands::Update { module } => update::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
-        Commands::Rm { module, dir } => rm::run(cli.dirs, module, dir),
+        Commands::Rm { module, dir, recursive } => rm::run(cli.dirs, module, dir, recursive),
+        Commands::Prune => prune::run(cli.dirs),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
         Commands::Profile => profile::run(cli.dirs),
     }

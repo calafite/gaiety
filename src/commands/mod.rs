@@ -7,6 +7,7 @@ pub mod new;
 pub mod path;
 pub mod profile;
 pub mod rename;
+pub mod prune;
 pub mod rm;
 pub mod sync;
 pub mod update;

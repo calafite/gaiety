@@ -5,7 +5,12 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Result<()> {
+pub fn run(
+    dirs: String,
+    module_name: String,
+    dir_filter: Option<PathBuf>,
+    recursive: bool,
+) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
@@ -31,14 +36,52 @@ pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Re
         },
     };
 
+    let mut to_remove = vec![m.manifest.module.name.clone()];
+
+    if recursive {
+        // Build dependency graph to find cascading orphans
+        let mut in_degrees: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for mod_item in &modules {
+            in_degrees.entry(mod_item.manifest.module.name.clone()).or_insert(0);
+            for dep in &mod_item.manifest.module.deps {
+                *in_degrees.entry(dep.name.clone()).or_insert(0) += 1;
+            }
+        }
+
+        // We simulate removal of the target and its dependencies recursively
+        let mut queue = vec![m.manifest.module.name.clone()];
+        let mut removed_set: std::collections::HashSet<String> = std::collections::HashSet::new();
+        removed_set.insert(m.manifest.module.name.clone());
+
+        while let Some(curr) = queue.pop() {
+            if let Some(curr_mod) = modules.iter().find(|x| x.manifest.module.name == curr) {
+                for dep in &curr_mod.manifest.module.deps {
+                    if let Some(deg) = in_degrees.get_mut(&dep.name) {
+                        if *deg > 0 {
+                            *deg -= 1;
+                        }
+                        if *deg == 0 && !removed_set.contains(&dep.name) {
+                            removed_set.insert(dep.name.clone());
+                            queue.push(dep.name.clone());
+                            to_remove.push(dep.name.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     println!("\n{} {}\n", "::".bold().cyan(), "Remove Module".bold().cyan());
-    println!("  {:<10} {}", "name:".dimmed(), module_name.green());
+    println!("  {:<10} {}", "target:".dimmed(), module_name.green());
+    if to_remove.len() > 1 {
+        println!("  {:<10} {}", "cascading:".dimmed(), to_remove[1..].join(", ").yellow());
+    }
     println!("  {:<10} {}\n", "path:".dimmed(), m.path.display().to_string().dimmed());
 
     print!(
-        "{} Remove module '{}'? [y/N] ",
+        "{} Remove {} module(s)? [y/N] ",
         "?".bold().yellow(),
-        module_name
+        to_remove.len()
     );
     io::stdout().flush()?;
 
@@ -46,9 +89,18 @@ pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Re
     io::stdin().read_line(&mut input)?;
 
     if input.trim().eq_ignore_ascii_case("y") {
-        let module_dir = m.path.parent().unwrap().to_path_buf();
-        fs::remove_dir_all(&m.path)?;
-        renumber_modules(&module_dir)?;
+        let mut affected_dirs = std::collections::HashSet::new();
+        for name in to_remove {
+            if let Some(target_mod) = modules.iter().find(|x| x.manifest.module.name == name) {
+                if let Some(parent) = target_mod.path.parent() {
+                    affected_dirs.insert(parent.to_path_buf());
+                }
+                fs::remove_dir_all(&target_mod.path)?;
+            }
+        }
+        for dir in affected_dirs {
+            renumber_modules(&dir)?;
+        }
         println!("{} removed\n", "✓".bold().green());
     } else {
         println!("{} aborted\n", "!".bold().yellow());
@@ -57,7 +109,7 @@ pub fn run(dirs: String, module_name: String, dir_filter: Option<PathBuf>) -> Re
     Ok(())
 }
 
-fn renumber_modules(dir: &PathBuf) -> Result<()> {
+pub fn renumber_modules(dir: &PathBuf) -> Result<()> {
     let mut dirs: Vec<_> = fs::read_dir(dir)?
         .filter_map(|e| e.ok())
         .map(|e| e.path())
