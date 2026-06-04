@@ -105,13 +105,10 @@ pub fn install_recursive(
     let _ = fs::remove_dir_all(&tmp_dir);
     result?;
 
-    // Reload modules to find the newly installed module and its dependencies
     let loader = Loader::new(dirs)?;
     let updated_modules = loader.get_modules()?;
     
-    // Find the newly installed module(s) to check their dependencies
     for m in &updated_modules {
-        // We only check dependencies of loaded or newly added modules
         for dep in &m.manifest.module.deps {
             if let Some(ref dep_source) = dep.source {
                 let dep_exists = updated_modules.iter().any(|mod_item| mod_item.manifest.module.name == dep.name);
