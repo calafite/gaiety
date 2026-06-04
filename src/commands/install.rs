@@ -12,11 +12,27 @@ pub fn run(
     branch_override: Option<String>,
     target: Option<PathBuf>,
 ) -> Result<()> {
+    let mut visited = std::collections::HashSet::new();
+    install_recursive(&dirs, &spec, name_override, branch_override, target, &mut visited)
+}
+
+pub fn install_recursive(
+    dirs: &str,
+    spec: &str,
+    name_override: Option<String>,
+    branch_override: Option<String>,
+    target: Option<PathBuf>,
+    visited: &mut std::collections::HashSet<String>,
+) -> Result<()> {
+    if !visited.insert(spec.to_string()) {
+        bail!("Circular remote dependency detected for spec: {}", spec);
+    }
+
     require_git()?;
 
-    let parsed = parse_spec(&spec, branch_override)?;
+    let parsed = parse_spec(spec, branch_override)?;
 
-    let loader = Loader::new(&dirs)?;
+    let loader = Loader::new(dirs)?;
     let modules = loader.get_modules()?;
 
     let write_dir = target.as_ref().unwrap_or_else(|| loader.default_write_dir()).clone();
@@ -82,7 +98,32 @@ pub fn run(
     };
 
     let _ = fs::remove_dir_all(&tmp_dir);
-    result
+    result?;
+
+    // Reload modules to find the newly installed module and its dependencies
+    let loader = Loader::new(dirs)?;
+    let updated_modules = loader.get_modules()?;
+    
+    // Find the newly installed module(s) to check their dependencies
+    for m in &updated_modules {
+        // We only check dependencies of loaded or newly added modules
+        for dep in &m.manifest.module.deps {
+            if let Some(ref dep_source) = dep.source {
+                let dep_exists = updated_modules.iter().any(|mod_item| mod_item.manifest.module.name == dep.name);
+                if !dep_exists {
+                    println!(
+                        "{} Installing missing dependency '{}' from '{}'...",
+                        "->".bold().blue(),
+                        dep.name.green(),
+                        dep_source.dimmed()
+                    );
+                    install_recursive(dirs, dep_source, Some(dep.name.clone()), None, target.clone(), visited)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn install_single(

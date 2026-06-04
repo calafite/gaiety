@@ -59,6 +59,7 @@ pub struct ModuleMeta {
 pub struct Dep {
     pub name: String,
     pub version: Option<String>,
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone, PartialEq)]

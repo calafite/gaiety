@@ -3,7 +3,7 @@ name        = "{{MODULE_NAME}}"
 description = "Write a short description here"
 version     = "1.0.0"
 deps        = []
-#deps = [{ name = "example", version = ">=1.0.0" }]
+#deps = [{ name = "example", version = ">=1.0.0", source = "user/repo" }]
 tags        = []
 requires_cmd     = []
 requires_any_cmd = []

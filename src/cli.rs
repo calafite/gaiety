@@ -1,4 +1,4 @@
-use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update, prune};
+use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update, prune, resolve};
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::{Parser, Subcommand};
@@ -108,6 +108,9 @@ pub enum Commands {
     /// Remove unused implicit dependencies
     Prune,
 
+    /// Automatically resolve and install missing remote dependencies
+    Resolve,
+
     /// Rename a module, update its manifest, and rewrite all dependents
     Rename {
         /// Current module name
@@ -135,6 +138,7 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm { module, dir, recursive } => rm::run(cli.dirs, module, dir, recursive),
         Commands::Prune => prune::run(cli.dirs),
+        Commands::Resolve => resolve::run(cli.dirs),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
         Commands::Profile => profile::run(cli.dirs),
     }
