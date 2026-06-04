@@ -12,7 +12,7 @@ toml = "*"
 toml_edit = "*"
 colored = "*"
 shellexpand = "*"
-git2 = "0.18"
+git2 = "*"
 
 
 [[bin]]

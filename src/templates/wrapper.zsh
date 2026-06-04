@@ -56,7 +56,12 @@ gai() {
             fi
             return $_gai_exit
             ;;
-        list|info|new|rm|rename|profile|path)
+        resolve)
+            {{GAIETY_BIN}} "$@" || return $?
+            echo ""
+            echo "\033[1m\033[34m=> \033[0m\033[2mRun 'gai reload' to load any newly installed modules.\033[0m"
+            ;;
+        list|info|new|rm|rename|prune|profile|path)
             {{GAIETY_BIN}} "$@"
             ;;
         *)
@@ -81,6 +86,8 @@ gai() {
             echo "  ${d}Remote packages${r}"
             printf "    ${c}%-22s${r} ${d}%s${r}\n" "install <spec>"      "Install from a git repository"
             printf "    ${c}%-22s${r} ${d}%s${r}\n" "update [<name>]"     "Pull updates for installed module(s)"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "resolve"             "Install missing remote dependencies"
+            printf "    ${c}%-22s${r} ${d}%s${r}\n" "prune"               "Remove unused implicit dependencies"
             echo ""
             echo "  ${d}Runtime${r}"
             printf "    ${c}%-22s${r} ${d}%s${r}\n" "reload [<name>]"     "Reload all modules, or just <name>"
