@@ -41,25 +41,29 @@ The numeric prefix controls load order. Gaps are fine, as gaiety renumbers autom
 
 ```toml
 [module]
-name        = "list"
+name = "list"
 description = "directory listing with eza/exa"
-version     = "1.0.0"
-deps        = []
+version = "1.0.0"
+deps = []
 # deps = [{ name = "other_module", version = ">=1.0.0" }]
-tags        = []
+# deps = [{ name = "lib", version = ">=1.0.0", source = "user/repo" }]
+tags = []
 
 # skip if any of these binaries are unavailable
-requires_cmd     = []
+requires_cmd = []
 
 # skip if none of these binaries are available
 requires_any_cmd = ["eza", "exa"]
 
+# mark as an implicit/managed dependency (eligible for gai prune)
+implicit = false
+
 [api]
 # functions this module exposes ~ unloaded on reload
-functions  = ["ls", "ll", "la", "lt", "lta", "help_ls"]
+functions = ["ls", "ll", "la", "lt", "lta", "help_ls"]
 
 # variables this module sets ~ unset on reload
-variables  = []
+variables = []
 
 # aliases = { top = "btop" }
 # completions = { "lt" = "_rt_comp_dirs" }
@@ -69,9 +73,9 @@ defer_on_cmd = false
 
 # managed by gai install ~ do not edit manually
 # [source]
-# url    = "https://github.com/user/repo.git"
+# url = "https://github.com/user/repo.git"
 # branch = "main"
-# pin    = "abcdef1"
+# pin = "abcdef1"
 ```
 
 ### Version constraints
@@ -90,6 +94,16 @@ Dep entries accept standard semver operators:
 ```
 
 Short versions are accepted: `1` and `1.2` are treated as `1.0.0` and `1.2.0`. Pre-release versions (`1.0.0-alpha`) are supported in both `version` and constraints. Note that `>=1.0.0` does not match `1.0.1-alpha` ~ to match a pre-release the constraint must include one: `>=1.0.0-alpha`.
+
+### Remote dependency sources
+
+A dep entry can include a `source` field pointing to a git repository:
+
+```toml
+deps = [{ name = "mylib", version = ">=1.0.0", source = "user/mylib" }]
+```
+
+If the dependency is missing, `gai resolve` will use the `source` field to fetch and install it automatically. The `source` field accepts the same spec formats as `gai install`.
 
 ### init.zsh
 
@@ -117,6 +131,8 @@ gai rename <old> <new>      rename a module and update dependents
 gai rm <name>               remove a module
 gai install <spec>          install from a git repository
 gai update [<name>]         pull updates for installed module(s)
+gai resolve                 install missing remote dependencies
+gai prune                   remove unused implicit dependencies
 gai reload [<name>]         reload all modules, or just <name>
 gai sync                    write the init script to the cache file
 gai browse                  browse modules interactively (requires fzf)
@@ -176,7 +192,7 @@ gai browse
 
 ### gai install
 
-Downloads a module from a git repository. Generates the `module.toml` and `init.zsh` wrapper automatically. If the repository contains multiple modules (a collection), all valid modules inside it will be installed.
+Downloads a module from a git repository. Generates the `module.toml` and `init.zsh` wrapper automatically. If the repository contains multiple modules (a collection), all valid modules inside it will be installed. Dependencies with a `source` field are fetched recursively.
 
 ```zsh
 # github shorthand
@@ -203,6 +219,26 @@ gai update
 gai update zsh_autosuggestions
 ```
 
+### gai resolve
+
+Scans for modules with a missing dependency that has a `source` field, then installs those dependencies automatically.
+
+```zsh
+gai resolve
+```
+
+Useful after cloning a config repository where some managed dependencies have not been installed yet. Only acts on deps that declare a `source`; purely local dependencies must be installed manually.
+
+### gai prune
+
+Removes modules that are marked `implicit = true` and are no longer required by any loaded module. Prompts for confirmation before deleting anything.
+
+```zsh
+gai prune
+```
+
+`implicit = true` is set automatically by `gai install` on dependencies it pulls in. Marking a module implicit yourself signals that it exists only to serve other modules and should be cleaned up when those modules are gone.
+
 ### gai new
 
 Creates a numbered directory with `module.toml` and `init.zsh` from templates. Prefix is assigned automatically.
@@ -213,7 +249,7 @@ gai new mything
 #          03_mything/init.zsh
 ```
 
-New modules are created with `defer_on_cmd = true` by default. Remove or set to `false` if the module needs to run code at shell startup (e.g. setting variables, running `eval "$(tool init zsh)"`).
+New modules are created with `defer_on_cmd = true` by default. Remove or set to `false` if the module needs to run code at shell startup (e.g. setting variables, running `eval "$(tool init zsh)"`, or setting up keybindings).
 
 Use `--target` to write to a specific directory:
 
@@ -235,10 +271,16 @@ Prompts for confirmation, deletes the directory, and renumbers remaining modules
 
 ```zsh
 gai rm mything
-# ? remove module 'mything'? [y/n]
+# ? Remove 1 module(s)? [y/N]
 ```
 
 Use `--dir` to restrict the search to a specific directory if the same module name exists in multiple locations.
+
+Use `--recursive` to also remove dependencies that become orphaned after the module is deleted. Only dependencies with no other dependents are removed.
+
+```zsh
+gai rm mything --recursive
+```
 
 ### gai profile
 
@@ -269,7 +311,7 @@ Setting `defer_on_cmd = true` in `[api]` tells gaiety not to source the module's
 
 ```toml
 [api]
-functions    = ["ls", "ll", "la"]
+functions = ["ls", "ll", "la"]
 defer_on_cmd = true
 ```
 
