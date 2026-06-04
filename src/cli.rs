@@ -1,4 +1,4 @@
-use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update};
+use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update, prune};
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::{Parser, Subcommand};

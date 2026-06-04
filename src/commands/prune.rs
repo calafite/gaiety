@@ -3,17 +3,15 @@ use anyhow::{Result};
 use colored::Colorize;
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
 
 pub fn run(dirs: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
-    let mut modules = loader.get_modules()?;
+    let modules = loader.get_modules()?;
 
     let mut to_prune = Vec::new();
     let mut pruned_set = std::collections::HashSet::new();
 
     loop {
-        // Calculate in-degrees of all modules not yet marked for pruning
         let mut in_degrees: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for m in &modules {
             if pruned_set.contains(&m.manifest.module.name) {
@@ -27,7 +25,6 @@ pub fn run(dirs: String) -> Result<()> {
             }
         }
 
-        // Find any module with implicit == Some(true) and in-degree == 0
         let mut found_any = false;
         for m in &modules {
             let name = &m.manifest.module.name;
