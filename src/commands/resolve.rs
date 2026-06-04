@@ -17,7 +17,6 @@ pub fn run(dirs: String) -> Result<()> {
     for m in &modules {
         match &m.status {
             ModuleStatus::SkippedMissingDep(dep_name) | ModuleStatus::SkippedBadConstraint(dep_name) => {
-                // Find if the dependent module specified a source for this dependency
                 if let Some(dep) = m.manifest.module.deps.iter().find(|d| &d.name == dep_name) {
                     if let Some(ref source) = dep.source {
                         println!(
