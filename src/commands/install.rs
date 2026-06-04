@@ -1,8 +1,6 @@
 use crate::core::Loader;
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
-use git2::build::RepoBuilder;
-use git2::Repository;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -53,15 +51,29 @@ pub fn install_recursive(
         println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
     }
 
-    let mut builder = RepoBuilder::new();
+    let mut args = vec!["clone".to_string()];
     if let Some(ref b) = parsed.branch {
-        builder.branch(b);
+        args.push("-b".to_string());
+        args.push(b.clone());
     }
-    if let Err(e) = builder.clone(&parsed.url, &tmp_dir) {
-        if tmp_dir.exists() {
-            let _ = fs::remove_dir_all(&tmp_dir);
+    args.push(parsed.url.clone());
+    args.push(tmp_dir.to_string_lossy().into_owned());
+
+    let clone_status = Command::new("git")
+        .args(&args)
+        .env("LC_ALL", "C")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .status();
+
+    match clone_status {
+        Ok(status) if status.success() => {}
+        _ => {
+            if tmp_dir.exists() {
+                let _ = fs::remove_dir_all(&tmp_dir);
+            }
+            bail!("git clone failed");
         }
-        bail!("git clone failed: {}", e);
     }
 
     let pin = head_commit(&tmp_dir);
@@ -480,15 +492,22 @@ pub fn is_valid_name(name: &str) -> bool {
 }
 
 pub fn head_commit(dir: &Path) -> Option<String> {
-    let repo = Repository::open(dir).ok()?;
-    let head = repo.head().ok()?;
-    let target = head.target()?;
-    let hash = target.to_string();
-    if hash.len() >= 7 {
-        Some(hash[..7].to_string())
-    } else {
-        Some(hash)
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .arg("rev-parse")
+        .arg("--short")
+        .arg("HEAD")
+        .env("LC_ALL", "C")
+        .output()
+        .ok()?;
+    if out.status.success() {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() {
+            return Some(s);
+        }
     }
+    None
 }
 
 fn build_source_block(parsed: &ParsedSpec, pin: Option<&str>) -> String {
