@@ -1,6 +1,8 @@
 use crate::core::Loader;
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
+use git2::build::RepoBuilder;
+use git2::Repository;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -51,24 +53,15 @@ pub fn install_recursive(
         println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
     }
 
-    let mut clone_args: Vec<String> = vec!["clone".into(), "--depth=1".into()];
+    let mut builder = RepoBuilder::new();
     if let Some(ref b) = parsed.branch {
-        clone_args.push("--branch".into());
-        clone_args.push(b.clone());
+        builder.branch(b);
     }
-    clone_args.push(parsed.url.clone());
-    clone_args.push(tmp_dir.to_string_lossy().into_owned());
-
-    let status = Command::new("git")
-        .args(&clone_args)
-        .status()
-        .context("Failed to run git")?;
-
-    if !status.success() {
+    if let Err(e) = builder.clone(&parsed.url, &tmp_dir) {
         if tmp_dir.exists() {
             let _ = fs::remove_dir_all(&tmp_dir);
         }
-        bail!("git clone failed — see output above");
+        bail!("git clone failed: {}", e);
     }
 
     let pin = head_commit(&tmp_dir);
@@ -487,14 +480,15 @@ pub fn is_valid_name(name: &str) -> bool {
 }
 
 pub fn head_commit(dir: &Path) -> Option<String> {
-    Command::new("git")
-        .args(["-C", &dir.to_string_lossy(), "rev-parse", "--short", "HEAD"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    let repo = Repository::open(dir).ok()?;
+    let head = repo.head().ok()?;
+    let target = head.target()?;
+    let hash = target.to_string();
+    if hash.len() >= 7 {
+        Some(hash[..7].to_string())
+    } else {
+        Some(hash)
+    }
 }
 
 fn build_source_block(parsed: &ParsedSpec, pin: Option<&str>) -> String {

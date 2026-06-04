@@ -2,6 +2,7 @@ use crate::commands::install::head_commit;
 use crate::core::Loader;
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
+use git2::Repository;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -61,35 +62,47 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
 
         print!("  {}  ", format!("{:<width$}", name.green(), width = col_w));
 
-        let path_str = m.path.to_string_lossy().into_owned();
-        let mut args = vec!["-C".to_string(), path_str, "pull".to_string()];
-        if let Some(ref b) = src.branch {
-            args.push("origin".to_string());
-            args.push(b.as_str().to_string());
-        }
+        let check_and_pull = || -> Result<bool> {
+            let repo = Repository::open(&m.path)?;
+            let mut remote = repo.find_remote("origin")?;
+            remote.fetch(&["HEAD"], None, None)?;
 
-        match Command::new("git").args(&args).output() {
-            Ok(out) if out.status.success() => {
-                let stdout = String::from_utf8_lossy(&out.stdout);
-                if stdout.contains("Already up to date") || stdout.contains("Already up-to-date") {
-                    println!("{}", "up to date".dimmed());
-                    already_current += 1;
-                } else {
-                    if let Some(ref p) = head_commit(&m.path) {
-                        let _ = update_pin_in_toml(&m.path.join("module.toml"), p);
-                    }
-                    println!("{}", "updated".bold().green());
-                    updated += 1;
+            let local_hash = repo.head()?.target().context("No HEAD target")?;
+            let fetch_head = repo.find_reference("FETCH_HEAD")?.target().context("No FETCH_HEAD target")?;
+
+            if local_hash == fetch_head {
+                Ok(false) // Already up to date
+            } else {
+                // Fallback to git pull for the actual update execution
+                let path_str = m.path.to_string_lossy().into_owned();
+                let mut args = vec!["-C".to_string(), path_str, "pull".to_string()];
+                if let Some(ref b) = src.branch {
+                    args.push("origin".to_string());
+                    args.push(b.as_str().to_string());
                 }
+                let out = Command::new("git").args(&args).output()?;
+                if !out.status.success() {
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    bail!("{}", stderr.trim());
+                }
+                Ok(true) // Updated
             }
-            Ok(out) => {
-                let stderr = String::from_utf8_lossy(&out.stderr);
-                println!("{}", "failed".bold().red());
-                eprintln!("    {} {}", "git:".dimmed(), stderr.trim().dimmed());
-                failed += 1;
+        };
+
+        match check_and_pull() {
+            Ok(true) => {
+                if let Some(ref p) = head_commit(&m.path) {
+                    let _ = update_pin_in_toml(&m.path.join("module.toml"), p);
+                }
+                println!("{}", "updated".bold().green());
+                updated += 1;
+            }
+            Ok(false) => {
+                println!("{}", "up to date".dimmed());
+                already_current += 1;
             }
             Err(e) => {
-                println!("{}", "error".bold().red());
+                println!("{}", "failed".bold().red());
                 eprintln!("    {}", e);
                 failed += 1;
             }
@@ -114,35 +127,15 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                 .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
         }
 
-        let mut clone_args = vec!["clone".to_string(), "--depth=1".to_string()];
+        let mut builder = git2::build::RepoBuilder::new();
         if let Some(ref b) = branch {
-            clone_args.push("--branch".to_string());
-            clone_args.push(b.clone());
+            builder.branch(b);
         }
-        clone_args.push(url.clone());
-        clone_args.push(tmp_dir.to_string_lossy().into_owned());
 
-        let clone_status = Command::new("git").args(&clone_args).output();
-
-        let (clone_ok, new_pin) = match clone_status {
-            Ok(out) if out.status.success() => {
+        let (clone_ok, new_pin) = match builder.clone(url, &tmp_dir) {
+            Ok(_) => {
                 let pin = head_commit(&tmp_dir);
                 (true, pin)
-            }
-            Ok(out) => {
-                for m in group {
-                    let name = &m.manifest.module.name;
-                    println!(
-                        "  {}  {}",
-                        format!("{:<width$}", name.green(), width = col_w),
-                        "clone failed".bold().red()
-                    );
-                    let stderr = String::from_utf8_lossy(&out.stderr);
-                    eprintln!("    {} {}", "git:".dimmed(), stderr.trim().dimmed());
-                    failed += 1;
-                }
-                let _ = fs::remove_dir_all(&tmp_dir);
-                continue;
             }
             Err(e) => {
                 for m in group {
@@ -150,11 +143,12 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                     println!(
                         "  {}  {}",
                         format!("{:<width$}", name.green(), width = col_w),
-                        "error".bold().red()
+                        "clone failed".bold().red()
                     );
                     eprintln!("    {}", e);
                     failed += 1;
                 }
+                let _ = fs::remove_dir_all(&tmp_dir);
                 continue;
             }
         };
