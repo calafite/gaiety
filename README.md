@@ -17,7 +17,7 @@ source "$GAI_CACHE"
 
 `GAI_DIRS` is colon-separated. Directories load left to right. Put system-wide modules first, personal ones last. The last directory is the default target for `gai new` and `gai rm`.
 
-`gaiety sync` writes the init script to `$GAI_CACHE` once. After that, startup is just a `source`. Run `gai reload` after adding or editing modules, it resyncs and re-sources automatically.
+`gaiety sync` writes the init script to `$GAI_CACHE` once and automatically background-compiles (`zcompile`) all scripts for performance. After that, startup is just a `source`. Run `gai reload` after adding or editing modules, it resyncs and re-sources automatically.
 
 ---
 
@@ -25,7 +25,7 @@ source "$GAI_CACHE"
 
 Each module is a directory with two files:
 
-```
+```text
 ~/.config/gaiety/modules/
   01_list/
     module.toml
@@ -64,8 +64,14 @@ variables  = []
 # aliases = { top = "btop" }
 # completions = { "lt" = "_rt_comp_dirs" }
 
-# defer sourcing until first use ~ see Lazy Loading below
+# defer sourcing until first use ~ see lazy loading below
 defer_on_cmd = false
+
+# managed by gai install ~ do not edit manually
+# [source]
+# url    = "https://github.com/user/repo.git"
+# branch = "main"
+# pin    = "abcdef1"
 ```
 
 ### Version constraints
@@ -83,15 +89,17 @@ Dep entries accept standard semver operators:
 >=1.0, <2.0     compound (comma-separated)
 ```
 
-Short versions are accepted: `1` and `1.2` are treated as `1.0.0` and `1.2.0`. Pre-release versions (`1.0.0-alpha`) are supported in both `version` and constraints. Note that `>=1.0.0` does not match `1.0.1-alpha` — to match a pre-release the constraint must include one: `>=1.0.0-alpha`.
+Short versions are accepted: `1` and `1.2` are treated as `1.0.0` and `1.2.0`. Pre-release versions (`1.0.0-alpha`) are supported in both `version` and constraints. Note that `>=1.0.0` does not match `1.0.1-alpha` ~ to match a pre-release the constraint must include one: `>=1.0.0-alpha`.
 
 ### init.zsh
 
 Plain zsh. The manifest declares what it exposes, the script implements it. Prefix internal functions with `_modulename_` to avoid collisions.
 
 ```zsh
+# internal implementation
 _list_ls() { eza --icons --group-directories-first "$@"; }
 
+# public api
 ls() { _list_ls "$@"; }
 ll() { eza -lh --icons --group-directories-first "$@"; }
 ```
@@ -102,16 +110,18 @@ ll() { eza -lh --icons --group-directories-first "$@"; }
 
 ```text
 gaiety init                 emit the zsh initialization script
-gai sync                    write the init script to the cache file
 gai list                    list all modules and their status
-gai info <name>             show metadata and public api for a module
-gai path <name>             print the path to a module
+gai info <name>             show metadata and public api
+gai new <name>              scaffold a new module
+gai rename <old> <new>      rename a module and update dependents
+gai rm <name>               remove a module
+gai install <spec>          install from a git repository
+gai update [<name>]         pull updates for installed module(s)
+gai reload [<name>]         reload all modules, or just <name>
+gai sync                    write the init script to the cache file
 gai browse                  browse modules interactively (requires fzf)
-gai new <name>              scaffold a new module from templates
-gai rename <old> <new>      rename a module and update all dependents
-gai rm <name>               remove a module and renumber remaining
-gai reload [<name>]         reload all modules or just a specific one
-gai profile                 benchmark the load time of every module
+gai profile                 benchmark module load times
+gai path <name>             print the path to a module's init.zsh
 ```
 
 ### gai list
@@ -139,8 +149,8 @@ Shows full metadata for a single module, including whether it is lazy-loaded.
   path           ~/.config/gaiety/modules/01_list
   desc           directory listing with eza/exa
   version        1.0.0
-  deps           —
-  tags           —
+  deps           -
+  tags           -
   lazy           no
 
   Public API
@@ -162,6 +172,35 @@ Shows module status, version, and metadata. Hit enter to instantly reload the se
 
 ```zsh
 gai browse
+```
+
+### gai install
+
+Downloads a module from a git repository. Generates the `module.toml` and `init.zsh` wrapper automatically. If the repository contains multiple modules (a collection), all valid modules inside it will be installed.
+
+```zsh
+# github shorthand
+gai install zsh-users/zsh-autosuggestions
+
+# specific branch
+gai install zsh-users/zsh-syntax-highlighting@develop
+
+# full url
+gai install https://gitlab.com/user/repo.git
+```
+
+Accepts `--name` to override the derived module name, `--branch` to explicitly target a branch, and `--target` to place the module in a specific `GAI_DIRS` directory.
+
+### gai update
+
+Pulls updates for all installed modules that have a `[source]` block in their manifest.
+
+```zsh
+# update all managed modules
+gai update
+
+# update a specific module
+gai update zsh_autosuggestions
 ```
 
 ### gai new
@@ -199,6 +238,8 @@ gai rm mything
 # ? remove module 'mything'? [y/n]
 ```
 
+Use `--dir` to restrict the search to a specific directory if the same module name exists in multiple locations.
+
 ### gai profile
 
 Benchmarks the source time of every loaded module by running each `init.zsh` in an isolated zsh subprocess and reporting elapsed time.
@@ -216,7 +257,7 @@ fzf_fm                   0.341 ms  █
 Total                   18.857 ms
 ```
 
-Times are color-coded: green under 1 ms, yellow 1–5 ms, red above 5 ms. Lazy modules are shown in blue with a `(def)` suffix, their time reflects the one-time cost paid on first use, not at shell startup.
+Times are color-coded: green under 1 ms, yellow 1-5 ms, red above 5 ms. Lazy modules are shown in blue with a `(def)` suffix, their time reflects the one-time cost paid on first use, not at shell startup.
 
 Use `gai profile` to identify slow modules and decide which ones to make lazy.
 
