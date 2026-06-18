@@ -4,6 +4,7 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 
 pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
     let n = modules.len();
+
     if n == 0 {
         return;
     }
@@ -90,20 +91,19 @@ pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
         let mut tail = cyclic;
         tail.sort_by(|&a, &b| {
             let (ma, mb) = (&modules[a], &modules[b]);
-            ma.dir_index.cmp(&mb.dir_index).then_with(|| {
-                match (ma.prefix_order, mb.prefix_order) {
+            ma.dir_index
+                .cmp(&mb.dir_index)
+                .then_with(|| match (ma.prefix_order, mb.prefix_order) {
                     (Some(x), Some(y)) => x.cmp(&y),
                     (Some(_), None) => std::cmp::Ordering::Less,
                     (None, Some(_)) => std::cmp::Ordering::Greater,
                     (None, None) => ma.manifest.module.name.cmp(&mb.manifest.module.name),
-                }
-            })
+                })
         });
         order.extend(tail);
     }
 
-    let mut slots: Vec<Option<DiscoveredModule>> =
-        modules.drain(..).map(Some).collect();
+    let mut slots: Vec<Option<DiscoveredModule>> = modules.drain(..).map(Some).collect();
     modules.extend(order.into_iter().map(|i| slots[i].take().unwrap()));
 }
 
@@ -165,14 +165,21 @@ fn dfs_cycle(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sources::local::LocalSource;
     use crate::sources::ModuleSource;
+    use crate::sources::local::LocalSource;
     use std::fs;
     use std::path::PathBuf;
 
     fn create_temp_dir(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
-        p.push(format!("gai_test_resolver_{}_{}", name, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros()));
+        p.push(format!(
+            "gai_test_resolver_{}_{}",
+            name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+        ));
         fs::create_dir_all(&p).unwrap();
         p
     }
@@ -185,18 +192,26 @@ mod tests {
         fs::create_dir_all(&m1_dir).unwrap();
         fs::create_dir_all(&m2_dir).unwrap();
 
-        fs::write(m1_dir.join("module.toml"), r#"
+        fs::write(
+            m1_dir.join("module.toml"),
+            r#"
 [module]
 name = "m1"
 version = "1.0.0"
 deps = [ { name = "m2" } ]
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
-        fs::write(m2_dir.join("module.toml"), r#"
+        fs::write(
+            m2_dir.join("module.toml"),
+            r#"
 [module]
 name = "m2"
 version = "2.0.0"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let local_source = LocalSource::new(vec![temp.clone()]);
         let mut modules = local_source.fetch_modules().unwrap();

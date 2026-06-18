@@ -1,4 +1,6 @@
-use crate::commands::{browse, info, init, install, list, new, path, profile, rename, rm, sync, update, prune, resolve};
+use crate::commands::{
+    browse, info, init, install, list, new, path, profile, prune, rename, resolve, rm, sync, update,
+};
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::{Parser, Subcommand};
@@ -131,12 +133,19 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::List => list::run(cli.dirs),
         Commands::Info { module } => info::run(cli.dirs, module),
         Commands::Path { module } => path::run(cli.dirs, module),
-        Commands::Install { spec, name, branch, target } => {
-            install::run(cli.dirs, spec, name, branch, target)
-        }
+        Commands::Install {
+            spec,
+            name,
+            branch,
+            target,
+        } => install::run(cli.dirs, spec, name, branch, target),
         Commands::Update { module } => update::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
-        Commands::Rm { module, dir, recursive } => rm::run(cli.dirs, module, dir, recursive),
+        Commands::Rm {
+            module,
+            dir,
+            recursive,
+        } => rm::run(cli.dirs, module, dir, recursive),
         Commands::Prune => prune::run(cli.dirs),
         Commands::Resolve => resolve::run(cli.dirs),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),

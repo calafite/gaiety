@@ -22,6 +22,7 @@ impl Manifest {
                 requires_cmd: Vec::new(),
                 requires_any_cmd: Vec::new(),
                 implicit: None,
+                enabled: default_enabled(),
             },
             api: ApiMeta::default(),
             source: None,
@@ -30,8 +31,8 @@ impl Manifest {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct SourceMeta { 
-    pub url: String, 
+pub struct SourceMeta {
+    pub url: String,
     #[serde(default)]
     pub branch: Option<String>,
     #[serde(default)]
@@ -53,6 +54,8 @@ pub struct ModuleMeta {
     pub requires_any_cmd: Vec<String>,
     #[serde(default)]
     pub implicit: Option<bool>,
+    #[serde(default = "default_enabled")]
+    pub enabled: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
@@ -74,4 +77,9 @@ pub struct ApiMeta {
     pub completions: HashMap<String, String>,
     #[serde(default)]
     pub defer_on_cmd: bool,
+}
+
+//helper functions
+const fn default_enabled() -> Option<bool> {
+    Some(true)
 }
