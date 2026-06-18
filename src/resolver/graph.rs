@@ -10,6 +10,9 @@ pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
     }
 
     for m in modules.iter_mut() {
+        if m.status == ModuleStatus::Disabled {
+            continue;
+        }
         let mut seen_deps: HashSet<&str> = HashSet::new();
         for dep in &m.manifest.module.deps {
             if !seen_deps.insert(dep.name.as_str()) {
@@ -31,7 +34,7 @@ pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
     for (i, m) in modules.iter().enumerate() {
         if matches!(
             m.status,
-            ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_)
+            ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_) | ModuleStatus::Disabled
         ) {
             continue;
         }
