@@ -259,13 +259,11 @@ fn find_collection_subdir(clone_root: &Path, target_name: &str) -> Option<PathBu
         if !toml_path.exists() {
             continue;
         }
-        if let Ok(content) = fs::read_to_string(&toml_path) {
-            if let Ok(doc) = content.parse::<DocumentMut>() {
-                if doc["module"]["name"].as_str() == Some(target_name) {
+        if let Ok(content) = fs::read_to_string(&toml_path)
+            && let Ok(doc) = content.parse::<DocumentMut>()
+                && doc["module"]["name"].as_str() == Some(target_name) {
                     return Some(path);
                 }
-            }
-        }
     }
     None
 }
@@ -348,11 +346,10 @@ fn update_pin_in_toml(path: &Path, new_pin: &str) -> Result<()> {
     let mut doc: DocumentMut = content
         .parse()
         .with_context(|| format!("Failed to parse {}", path.display()))?;
-    if let Some(source) = doc.get_mut("source") {
-        if let Some(tbl) = source.as_table_mut() {
+    if let Some(source) = doc.get_mut("source")
+        && let Some(tbl) = source.as_table_mut() {
             tbl["pin"] = toml_edit::value(new_pin);
         }
-    }
     fs::write(path, doc.to_string())
         .with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())

@@ -60,13 +60,11 @@ fn has_command(cmd: &str) -> bool {
     if let Ok(paths) = std::env::var("PATH") {
         for path in paths.split(':') {
             let p = Path::new(path).join(cmd);
-            if p.is_file() {
-                if let Ok(meta) = p.metadata() {
-                    if meta.permissions().mode() & 0o111 != 0 {
+            if p.is_file()
+                && let Ok(meta) = p.metadata()
+                    && meta.permissions().mode() & 0o111 != 0 {
                         return true;
                     }
-                }
-            }
         }
     }
     false

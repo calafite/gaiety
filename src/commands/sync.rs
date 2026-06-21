@@ -7,11 +7,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn default_cache_path() -> PathBuf {
-    if let Ok(p) = std::env::var("GAI_CACHE") {
-        if !p.is_empty() {
+    if let Ok(p) = std::env::var("GAI_CACHE")
+        && !p.is_empty() {
             return PathBuf::from(p);
         }
-    }
 
     let base = std::env::var("XDG_CACHE_HOME")
         .ok()

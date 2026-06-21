@@ -19,7 +19,7 @@ pub fn run(
             return false;
         }
         match &dir_filter {
-            Some(filter) => m.path.parent().map_or(false, |p| p == filter),
+            Some(filter) => m.path.parent().is_some_and(|p| p == filter),
             None => true,
         }
     });
@@ -120,7 +120,7 @@ pub fn renumber_modules(dir: &PathBuf) -> Result<()> {
 
     for (i, path) in dirs.iter().enumerate() {
         let dir_name = path.file_name().unwrap().to_string_lossy();
-        let suffix = dir_name.splitn(2, '_').nth(1).unwrap_or(&dir_name);
+        let suffix = dir_name.split_once('_').map(|x| x.1).unwrap_or(&dir_name);
         let new_name = format!("{:02}_{}", i + 1, suffix);
         if dir_name != new_name {
             fs::rename(path, dir.join(&new_name))?;

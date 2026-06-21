@@ -17,8 +17,8 @@ pub fn run(dirs: String) -> Result<()> {
     for m in &modules {
         match &m.status {
             ModuleStatus::SkippedMissingDep(dep_name) | ModuleStatus::SkippedBadConstraint(dep_name) => {
-                if let Some(dep) = m.manifest.module.deps.iter().find(|d| &d.name == dep_name) {
-                    if let Some(ref source) = dep.source {
+                if let Some(dep) = m.manifest.module.deps.iter().find(|d| &d.name == dep_name)
+                    && let Some(ref source) = dep.source {
                         println!(
                             "Found remote source for missing dependency '{}' required by '{}': {}",
                             dep_name.green(),
@@ -28,7 +28,6 @@ pub fn run(dirs: String) -> Result<()> {
                         install_recursive(&dirs, source, Some(dep_name.clone()), None, None, &mut visited)?;
                         resolved_any = true;
                     }
-                }
             }
             _ => {}
         }

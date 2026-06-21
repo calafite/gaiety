@@ -30,7 +30,7 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
         .iter()
         .filter(|m| match write_dir_index {
             Some(idx) => m.dir_index == idx,
-            None => m.path.parent().map_or(false, |p| p == write_dir),
+            None => m.path.parent().is_some_and(|p| p == write_dir),
         })
         .filter_map(|m| m.prefix_order)
         .max()
@@ -56,7 +56,7 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
     println!("  {:<10} {}", "name:".dimmed(), module_name.green());
     println!("  {:<10} {}", "dir:".dimmed(), target_dir_name.green());
     println!("  {:<10} {}", "path:".dimmed(), target_dir.display().to_string().dimmed());
-    println!("  {:<10} {}", "files:".dimmed(), "module.toml, init.zsh");
+    println!("  {:<10} module.toml, init.zsh", "files:".dimmed());
     println!(
         "\n{} Edit the files, then run: {} {}\n",
         "=>".bold().blue(),

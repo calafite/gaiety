@@ -10,11 +10,10 @@ impl Loader {
         out.push_str(&self.generate_reset_fn(modules));
 
         for m in modules {
-            if m.status == ModuleStatus::Loaded {
-                if let Some(fn_body) = generate_module_reset_fn(m) {
+            if m.status == ModuleStatus::Loaded
+                && let Some(fn_body) = generate_module_reset_fn(m) {
                     out.push_str(&fn_body);
                 }
-            }
         }
 
         let exe_path = std::env::current_exe()

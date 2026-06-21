@@ -236,11 +236,10 @@ fn rename_dep(content: &str, old_name: &str, new_name: &str) -> Result<String> {
         .and_then(|d| d.as_array_mut())
     {
         for dep in deps.iter_mut() {
-            if let Some(tbl) = dep.as_inline_table_mut() {
-                if tbl.get("name").and_then(|v| v.as_str()) == Some(old_name) {
+            if let Some(tbl) = dep.as_inline_table_mut()
+                && tbl.get("name").and_then(|v| v.as_str()) == Some(old_name) {
                     tbl.insert("name", toml_edit::Value::from(new_name));
                 }
-            }
         }
     }
 

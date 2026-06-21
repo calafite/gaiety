@@ -370,7 +370,7 @@ fn next_prefix(
         .iter()
         .filter(|m| match write_dir_index {
             Some(idx) => m.dir_index == idx,
-            None => m.path.parent().map_or(false, |p| p == write_dir),
+            None => m.path.parent() == Some(write_dir),
         })
         .filter_map(|m| m.prefix_order)
         .max()

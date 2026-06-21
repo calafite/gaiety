@@ -13,7 +13,7 @@ pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::
     if let Ok(v) = semver::Version::parse(s) {
         return Ok(v);
     }
-    let (base, remainder) = if let Some(idx) = s.find(|c| c == '-' || c == '+') {
+    let (base, remainder) = if let Some(idx) = s.find(['-', '+']) {
         s.split_at(idx)
     } else {
         (s, "")

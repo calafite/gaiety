@@ -31,15 +31,13 @@ pub fn run(dirs: String) -> Result<()> {
             if pruned_set.contains(name) {
                 continue;
             }
-            if m.manifest.module.implicit == Some(true) {
-                if let Some(&deg) = in_degrees.get(name) {
-                    if deg == 0 {
+            if m.manifest.module.implicit == Some(true)
+                && let Some(&deg) = in_degrees.get(name)
+                    && deg == 0 {
                         to_prune.push(m.clone());
                         pruned_set.insert(name.clone());
                         found_any = true;
                     }
-                }
-            }
         }
 
         if !found_any {
