@@ -1,5 +1,5 @@
-use crate::core::types::{DiscoveredModule, ModuleStatus};
 use crate::core::parse_version_lenient;
+use crate::core::types::{DiscoveredModule, ModuleStatus};
 use anyhow::Result;
 
 pub fn validate_dependencies(modules: &mut [DiscoveredModule]) {
@@ -34,18 +34,18 @@ pub fn validate_dependencies(modules: &mut [DiscoveredModule]) {
                             match satisfies(version, constraint) {
                                 Ok(true) => {}
                                 Ok(false) => {
-                                    m.status = ModuleStatus::SkippedMissingDep(
-                                        format!("{}@{}", dep.name, constraint),
-                                    );
+                                    m.status = ModuleStatus::SkippedMissingDep(format!(
+                                        "{}@{}",
+                                        dep.name, constraint
+                                    ));
                                     changed = true;
                                     break;
                                 }
                                 Err(e) => {
-                                    m.status =
-                                        ModuleStatus::SkippedBadConstraint(format!(
-                                            "dep '{}': {}",
-                                            dep.name, e
-                                        ));
+                                    m.status = ModuleStatus::SkippedBadConstraint(format!(
+                                        "dep '{}': {}",
+                                        dep.name, e
+                                    ));
                                     changed = true;
                                     break;
                                 }

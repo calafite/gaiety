@@ -1,5 +1,5 @@
-use crate::core::types::{DiscoveredModule, ModuleStatus};
 use crate::core::Loader;
+use crate::core::types::{DiscoveredModule, ModuleStatus};
 use anyhow::Result;
 
 impl Loader {
@@ -11,17 +11,18 @@ impl Loader {
 
         for m in modules {
             if m.status == ModuleStatus::Loaded
-                && let Some(fn_body) = generate_module_reset_fn(m) {
-                    out.push_str(&fn_body);
-                }
+                && let Some(fn_body) = generate_module_reset_fn(m)
+            {
+                out.push_str(&fn_body);
+            }
         }
 
         let exe_path = std::env::current_exe()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| "gaiety".to_string());
 
-        let wrapper_template = include_str!("../templates/wrapper.zsh")
-            .replace("{{GAIETY_BIN}}", &exe_path);
+        let wrapper_template =
+            include_str!("../templates/wrapper.zsh").replace("{{GAIETY_BIN}}", &exe_path);
 
         out.push_str(&wrapper_template);
 
@@ -86,7 +87,10 @@ impl Loader {
 
                 out.push_str(&format!("{}() {{\n", loader_fn));
                 out.push_str(&format!("  unfunction {} 2>/dev/null\n", unfunction_list));
-                out.push_str(&format!("  source '{}'\n", sq_escape(&init_script.display().to_string())));
+                out.push_str(&format!(
+                    "  source '{}'\n",
+                    sq_escape(&init_script.display().to_string())
+                ));
 
                 for (name, expansion) in &m.manifest.api.aliases {
                     out.push_str(&format!(

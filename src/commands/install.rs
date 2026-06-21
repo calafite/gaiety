@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use colored::Colorize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,7 +13,14 @@ pub fn run(
     target: Option<PathBuf>,
 ) -> Result<()> {
     let mut visited = std::collections::HashSet::new();
-    install_recursive(&dirs, &spec, name_override, branch_override, target, &mut visited)
+    install_recursive(
+        &dirs,
+        &spec,
+        name_override,
+        branch_override,
+        target,
+        &mut visited,
+    )
 }
 
 pub fn install_recursive(
@@ -35,7 +42,10 @@ pub fn install_recursive(
     let loader = Loader::new(dirs)?;
     let modules = loader.get_modules()?;
 
-    let write_dir = target.as_ref().unwrap_or_else(|| loader.default_write_dir()).clone();
+    let write_dir = target
+        .as_ref()
+        .unwrap_or_else(|| loader.default_write_dir())
+        .clone();
 
     let tmp_name = format!(".gai_install_tmp_{}", std::process::id());
     let tmp_dir = write_dir.join(&tmp_name);
@@ -45,7 +55,11 @@ pub fn install_recursive(
             .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Install Package".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Install Package".bold().cyan()
+    );
     println!("  {:<12} {}", "source:".dimmed(), parsed.url.dimmed());
     if let Some(ref b) = parsed.branch {
         println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
@@ -99,7 +113,14 @@ pub fn install_recursive(
                 "warn:".bold().yellow()
             );
         }
-        install_collection(&collection_dirs, &parsed, &source_block, &modules, &write_dir, &loader)
+        install_collection(
+            &collection_dirs,
+            &parsed,
+            &source_block,
+            &modules,
+            &write_dir,
+            &loader,
+        )
     };
 
     let _ = fs::remove_dir_all(&tmp_dir);
@@ -107,11 +128,13 @@ pub fn install_recursive(
 
     let loader = Loader::new(dirs)?;
     let updated_modules = loader.get_modules()?;
-    
+
     for m in &updated_modules {
         for dep in &m.manifest.module.deps {
             if let Some(ref dep_source) = dep.source {
-                let dep_exists = updated_modules.iter().any(|mod_item| mod_item.manifest.module.name == dep.name);
+                let dep_exists = updated_modules
+                    .iter()
+                    .any(|mod_item| mod_item.manifest.module.name == dep.name);
                 if !dep_exists {
                     println!(
                         "{} Installing missing dependency '{}' from '{}'...",
@@ -119,7 +142,14 @@ pub fn install_recursive(
                         dep.name.green(),
                         dep_source.dimmed()
                     );
-                    install_recursive(dirs, dep_source, Some(dep.name.clone()), None, target.clone(), visited)?;
+                    install_recursive(
+                        dirs,
+                        dep_source,
+                        Some(dep.name.clone()),
+                        None,
+                        target.clone(),
+                        visited,
+                    )?;
                 }
             }
         }
@@ -146,10 +176,14 @@ fn install_single(
         );
     }
 
-    if modules.iter().any(|m| m.manifest.module.name == module_name) {
+    if modules
+        .iter()
+        .any(|m| m.manifest.module.name == module_name)
+    {
         bail!(
             "Module '{}' already exists. Use 'gai update {}' to pull the latest version.",
-            module_name, module_name
+            module_name,
+            module_name
         );
     }
 
@@ -163,7 +197,11 @@ fn install_single(
     }
 
     println!("  {:<12} {}", "module:".dimmed(), module_name.green());
-    println!("  {:<12} {}\n", "dest:".dimmed(), module_dir.display().to_string().dimmed());
+    println!(
+        "  {:<12} {}\n",
+        "dest:".dimmed(),
+        module_dir.display().to_string().dimmed()
+    );
 
     copy_dir(tmp_dir, &module_dir)?;
 
@@ -180,7 +218,10 @@ fn install_single(
         let toml_path = module_dir.join("module.toml");
         let existing = fs::read_to_string(&toml_path)?;
         if !existing.contains("[source]") {
-            fs::write(&toml_path, format!("{}\n{}", existing.trim_end(), source_block))?;
+            fs::write(
+                &toml_path,
+                format!("{}\n{}", existing.trim_end(), source_block),
+            )?;
         }
     } else {
         let content = format!(
@@ -277,7 +318,8 @@ fn install_collection(
         if modules.iter().any(|m| m.manifest.module.name == name) {
             bail!(
                 "Module '{}' already exists. Remove it with 'gai rm {}' before reinstalling.",
-                name, name
+                name,
+                name
             );
         }
 
@@ -297,7 +339,12 @@ fn install_collection(
     let write_dir_index = loader.dirs.iter().position(|d| d == write_dir);
     let mut prefix = next_prefix(modules, write_dir_index, write_dir);
 
-    let col_w = incoming.iter().map(|(n, _)| n.len()).max().unwrap_or(12).max(12);
+    let col_w = incoming
+        .iter()
+        .map(|(n, _)| n.len())
+        .max()
+        .unwrap_or(12)
+        .max(12);
 
     let mut installed: Vec<String> = Vec::new();
 
@@ -315,8 +362,11 @@ fn install_collection(
         let existing = fs::read_to_string(&toml_path)
             .with_context(|| format!("Failed to read {}", toml_path.display()))?;
         if !existing.contains("[source]") {
-            fs::write(&toml_path, format!("{}\n{}", existing.trim_end(), source_block))
-                .with_context(|| format!("Failed to write {}", toml_path.display()))?;
+            fs::write(
+                &toml_path,
+                format!("{}\n{}", existing.trim_end(), source_block),
+            )
+            .with_context(|| format!("Failed to write {}", toml_path.display()))?;
         }
 
         println!(
@@ -351,11 +401,7 @@ fn detect_collection(dir: &Path) -> Vec<PathBuf> {
         .flatten()
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| {
-            p.is_dir()
-                && p.join("module.toml").exists()
-                && p.join("init.zsh").exists()
-        })
+        .filter(|p| p.is_dir() && p.join("module.toml").exists() && p.join("init.zsh").exists())
         .collect();
     dirs.sort();
     dirs
@@ -379,10 +425,9 @@ fn next_prefix(
 }
 
 fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir(dst)
-        .with_context(|| format!("Failed to create dir: {}", dst.display()))?;
-    for entry in fs::read_dir(src)
-        .with_context(|| format!("Failed to read dir: {}", src.display()))?
+    fs::create_dir(dst).with_context(|| format!("Failed to create dir: {}", dst.display()))?;
+    for entry in
+        fs::read_dir(src).with_context(|| format!("Failed to read dir: {}", src.display()))?
     {
         let entry = entry?;
         let src_path = entry.path();
@@ -391,7 +436,11 @@ fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
             copy_dir(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path).with_context(|| {
-                format!("Failed to copy {} → {}", src_path.display(), dst_path.display())
+                format!(
+                    "Failed to copy {} → {}",
+                    src_path.display(),
+                    dst_path.display()
+                )
             })?;
         }
     }
@@ -405,53 +454,55 @@ struct ParsedSpec {
 }
 
 fn parse_spec(spec: &str, branch_override: Option<String>) -> Result<ParsedSpec> {
-    let (base, inline_branch) =
-        if !spec.starts_with("http://") && !spec.starts_with("https://") {
-            if let Some(pos) = spec.rfind('@') {
-                (&spec[..pos], Some(spec[pos + 1..].to_string()))
-            } else {
-                (spec, None)
-            }
+    let (base, inline_branch) = if !spec.starts_with("http://") && !spec.starts_with("https://") {
+        if let Some(pos) = spec.rfind('@') {
+            (&spec[..pos], Some(spec[pos + 1..].to_string()))
         } else {
             (spec, None)
-        };
+        }
+    } else {
+        (spec, None)
+    };
 
     let branch = branch_override.or(inline_branch);
 
-    let (raw_url, repo_name) =
-        if base.starts_with("http://") || base.starts_with("https://") {
-            let name = base
-                .trim_end_matches('/')
-                .trim_end_matches(".git")
-                .rsplit('/')
-                .next()
-                .unwrap_or("plugin")
-                .to_string();
-            (base.to_string(), name)
-        } else if let Some(path) = base.strip_prefix("github:") {
-            let name = last_segment(path);
-            (format!("https://github.com/{}", path), name)
-        } else if let Some(path) = base.strip_prefix("gitlab:") {
-            let name = last_segment(path);
-            (format!("https://gitlab.com/{}", path), name)
-        } else if base.contains('/') {
-            let name = last_segment(base);
-            (format!("https://github.com/{}", base), name)
-        } else {
-            bail!(
-                "Cannot parse package spec '{}'.\n  \
+    let (raw_url, repo_name) = if base.starts_with("http://") || base.starts_with("https://") {
+        let name = base
+            .trim_end_matches('/')
+            .trim_end_matches(".git")
+            .rsplit('/')
+            .next()
+            .unwrap_or("plugin")
+            .to_string();
+        (base.to_string(), name)
+    } else if let Some(path) = base.strip_prefix("github:") {
+        let name = last_segment(path);
+        (format!("https://github.com/{}", path), name)
+    } else if let Some(path) = base.strip_prefix("gitlab:") {
+        let name = last_segment(path);
+        (format!("https://gitlab.com/{}", path), name)
+    } else if base.contains('/') {
+        let name = last_segment(base);
+        (format!("https://github.com/{}", base), name)
+    } else {
+        bail!(
+            "Cannot parse package spec '{}'.\n  \
                  Expected one of:\n  \
                  • user/repo\n  \
                  • user/repo@branch\n  \
                  • github:user/repo\n  \
                  • gitlab:user/repo\n  \
                  • https://host/user/repo.git",
-                spec
-            );
-        };
+            spec
+        );
+    };
 
     let url = format!("{}.git", raw_url.trim_end_matches(".git"));
-    Ok(ParsedSpec { url, repo_name, branch })
+    Ok(ParsedSpec {
+        url,
+        repo_name,
+        branch,
+    })
 }
 
 fn last_segment(path: &str) -> String {
@@ -581,7 +632,10 @@ mod tests {
 
     #[test]
     fn test_repo_to_module_name() {
-        assert_eq!(repo_to_module_name("zsh-syntax-highlighting"), "zsh_syntax_highlighting");
+        assert_eq!(
+            repo_to_module_name("zsh-syntax-highlighting"),
+            "zsh_syntax_highlighting"
+        );
         assert_eq!(repo_to_module_name("MyPlugin.zsh"), "myplugin_zsh");
         assert_eq!(repo_to_module_name("123plugin"), "_123plugin");
     }
@@ -589,7 +643,10 @@ mod tests {
     #[test]
     fn test_parse_spec_github_shorthand() {
         let p = parse_spec("zsh-users/zsh-syntax-highlighting", None).unwrap();
-        assert_eq!(p.url, "https://github.com/zsh-users/zsh-syntax-highlighting.git");
+        assert_eq!(
+            p.url,
+            "https://github.com/zsh-users/zsh-syntax-highlighting.git"
+        );
         assert_eq!(p.repo_name, "zsh-syntax-highlighting");
         assert!(p.branch.is_none());
     }
@@ -647,7 +704,11 @@ mod tests {
         for name in &["alpha", "beta"] {
             let d = tmp.join(name);
             fs::create_dir_all(&d).unwrap();
-            fs::write(d.join("module.toml"), format!("[module]\nname=\"{}\"\nversion=\"1.0.0\"", name)).unwrap();
+            fs::write(
+                d.join("module.toml"),
+                format!("[module]\nname=\"{}\"\nversion=\"1.0.0\"", name),
+            )
+            .unwrap();
             fs::write(d.join("init.zsh"), "").unwrap();
         }
 
@@ -655,7 +716,8 @@ mod tests {
 
         let found = detect_collection(&tmp);
         assert_eq!(found.len(), 2);
-        let names: Vec<_> = found.iter()
+        let names: Vec<_> = found
+            .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         assert!(names.contains(&"alpha".to_string()));

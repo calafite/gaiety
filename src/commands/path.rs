@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 pub fn run(dirs: String, module_name: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;

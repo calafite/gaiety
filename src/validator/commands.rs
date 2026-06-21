@@ -62,9 +62,10 @@ fn has_command(cmd: &str) -> bool {
             let p = Path::new(path).join(cmd);
             if p.is_file()
                 && let Ok(meta) = p.metadata()
-                    && meta.permissions().mode() & 0o111 != 0 {
-                        return true;
-                    }
+                && meta.permissions().mode() & 0o111 != 0
+            {
+                return true;
+            }
         }
     }
     false

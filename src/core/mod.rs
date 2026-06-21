@@ -1,13 +1,13 @@
 pub mod manifest;
 pub mod types;
 
+use crate::resolver::graph::sort_modules;
+use crate::sources::ModuleSource;
+use crate::sources::local::LocalSource;
+use crate::validator::{validate_any_commands, validate_commands, validate_dependencies};
 use anyhow::Result;
 use std::path::PathBuf;
 use types::DiscoveredModule;
-use crate::sources::local::LocalSource;
-use crate::sources::ModuleSource;
-use crate::resolver::graph::sort_modules;
-use crate::validator::{validate_commands, validate_any_commands, validate_dependencies};
 
 pub(crate) fn parse_version_lenient(s: &str) -> Result<semver::Version, semver::Error> {
     if let Ok(v) = semver::Version::parse(s) {
@@ -73,10 +73,22 @@ mod tests {
 
     #[test]
     fn test_parse_version_lenient() {
-        assert_eq!(parse_version_lenient("1.2.3").unwrap(), semver::Version::new(1, 2, 3));
-        assert_eq!(parse_version_lenient("1.2").unwrap(), semver::Version::new(1, 2, 0));
-        assert_eq!(parse_version_lenient("1").unwrap(), semver::Version::new(1, 0, 0));
-        assert_eq!(parse_version_lenient("1.2-alpha").unwrap(), semver::Version::parse("1.2.0-alpha").unwrap());
+        assert_eq!(
+            parse_version_lenient("1.2.3").unwrap(),
+            semver::Version::new(1, 2, 3)
+        );
+        assert_eq!(
+            parse_version_lenient("1.2").unwrap(),
+            semver::Version::new(1, 2, 0)
+        );
+        assert_eq!(
+            parse_version_lenient("1").unwrap(),
+            semver::Version::new(1, 0, 0)
+        );
+        assert_eq!(
+            parse_version_lenient("1.2-alpha").unwrap(),
+            semver::Version::parse("1.2.0-alpha").unwrap()
+        );
     }
 
     #[test]

@@ -1,6 +1,6 @@
+use super::ModuleSource;
 use crate::core::manifest::Manifest;
 use crate::core::types::{DiscoveredModule, ModuleStatus};
-use super::ModuleSource;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs;

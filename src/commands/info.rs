@@ -1,6 +1,6 @@
-use crate::core::types::ModuleStatus;
 use crate::core::Loader;
-use anyhow::{bail, Result};
+use crate::core::types::ModuleStatus;
+use anyhow::{Result, bail};
 use colored::Colorize;
 
 pub fn run(dirs: String, module_name: String) -> Result<()> {
@@ -36,7 +36,9 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     let deps = if m.manifest.module.deps.is_empty() {
         "—".to_string()
     } else {
-        m.manifest.module.deps
+        m.manifest
+            .module
+            .deps
             .iter()
             .map(|d| match &d.version {
                 Some(v) => format!("{}@{}", d.name, v),
@@ -93,11 +95,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
             );
         }
         ModuleStatus::SkippedBadConstraint(detail) => {
-            println!(
-                "  {} bad version constraint: {}",
-                kw("error"),
-                detail.red()
-            );
+            println!("  {} bad version constraint: {}", kw("error"), detail.red());
         }
         ModuleStatus::SkippedCycle(path) => {
             println!(
@@ -107,11 +105,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
             );
         }
         ModuleStatus::FailedManifest(detail) => {
-            println!(
-                "  {} {}",
-                kw("error"),
-                detail.red()
-            );
+            println!("  {} {}", kw("error"), detail.red());
         }
         ModuleStatus::WarnDuplicateDep(dep) => {
             println!(
@@ -126,8 +120,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     println!();
 
     let api = &m.manifest.api;
-    let has_api =
-        !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
+    let has_api = !api.functions.is_empty() || !api.variables.is_empty() || !api.aliases.is_empty();
 
     if has_api {
         println!("  {}", "Public API".bold().cyan());
@@ -168,11 +161,7 @@ pub fn run(dirs: String, module_name: String) -> Result<()> {
     if let Some(ref src) = m.manifest.source {
         println!();
         println!("  {}", "Source".bold().cyan());
-        println!(
-            "    {:<10} {}",
-            "url:".dimmed(),
-            src.url.dimmed()
-        );
+        println!("    {:<10} {}", "url:".dimmed(), src.url.dimmed());
         if let Some(ref b) = src.branch {
             println!("    {:<10} {}", "branch:".dimmed(), b.dimmed());
         }

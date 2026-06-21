@@ -1,5 +1,5 @@
-use crate::core::types::ModuleStatus;
 use crate::core::Loader;
+use crate::core::types::ModuleStatus;
 use anyhow::{Context, Result};
 use colored::Colorize;
 use std::fs;
@@ -20,7 +20,7 @@ pub fn run(dirs: String) -> Result<()> {
     }
 
     let mut script = String::new();
-    script.push_str("zmodload zsh/datetime\n"); 
+    script.push_str("zmodload zsh/datetime\n");
     script.push_str("compdef() { : }\n");
 
     for m in &loaded_modules {
@@ -40,8 +40,7 @@ pub fn run(dirs: String) -> Result<()> {
     let temp_dir = std::env::temp_dir();
     let temp_path = temp_dir.join(format!("gaiety_profile_{}.zsh", std::process::id()));
 
-    fs::write(&temp_path, &script)
-        .context("Failed to write temporary profiling script")?;
+    fs::write(&temp_path, &script).context("Failed to write temporary profiling script")?;
 
     let output = Command::new("zsh")
         .arg("-f")
@@ -78,7 +77,11 @@ pub fn run(dirs: String) -> Result<()> {
         .map(|m| m.manifest.module.name.clone())
         .collect();
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Module Load Profile".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Module Load Profile".bold().cyan()
+    );
 
     println!(
         "{}  {}  {}",

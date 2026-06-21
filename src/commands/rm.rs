@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use colored::Colorize;
 use std::fs;
 use std::io::{self, Write};
@@ -40,9 +40,12 @@ pub fn run(
 
     if recursive {
         // Build dependency graph to find cascading orphans
-        let mut in_degrees: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut in_degrees: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
         for mod_item in &modules {
-            in_degrees.entry(mod_item.manifest.module.name.clone()).or_insert(0);
+            in_degrees
+                .entry(mod_item.manifest.module.name.clone())
+                .or_insert(0);
             for dep in &mod_item.manifest.module.deps {
                 *in_degrees.entry(dep.name.clone()).or_insert(0) += 1;
             }
@@ -71,12 +74,24 @@ pub fn run(
         }
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Remove Module".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Remove Module".bold().cyan()
+    );
     println!("  {:<10} {}", "target:".dimmed(), module_name.green());
     if to_remove.len() > 1 {
-        println!("  {:<10} {}", "cascading:".dimmed(), to_remove[1..].join(", ").yellow());
+        println!(
+            "  {:<10} {}",
+            "cascading:".dimmed(),
+            to_remove[1..].join(", ").yellow()
+        );
     }
-    println!("  {:<10} {}\n", "path:".dimmed(), m.path.display().to_string().dimmed());
+    println!(
+        "  {:<10} {}\n",
+        "path:".dimmed(),
+        m.path.display().to_string().dimmed()
+    );
 
     print!(
         "{} Remove {} module(s)? [y/N] ",
@@ -136,7 +151,14 @@ mod tests {
 
     fn create_temp_dir(name: &str) -> PathBuf {
         let mut p = std::env::temp_dir();
-        p.push(format!("gai_test_rm_{}_{}", name, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros()));
+        p.push(format!(
+            "gai_test_rm_{}_{}",
+            name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+        ));
         fs::create_dir_all(&p).unwrap();
         p
     }

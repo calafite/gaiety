@@ -1,10 +1,10 @@
 mod cli;
 mod commands;
 mod core;
-mod sources;
-mod resolver;
-mod validator;
 mod emitter;
+mod resolver;
+mod sources;
+mod validator;
 
 use anyhow::Result;
 use clap::Parser;

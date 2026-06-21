@@ -1,5 +1,5 @@
-use crate::core::types::ModuleStatus;
 use crate::core::Loader;
+use crate::core::types::ModuleStatus;
 use crate::validator::check_completions;
 use anyhow::{Context, Result};
 use colored::Colorize;
@@ -8,9 +8,10 @@ use std::path::{Path, PathBuf};
 
 pub fn default_cache_path() -> PathBuf {
     if let Ok(p) = std::env::var("GAI_CACHE")
-        && !p.is_empty() {
-            return PathBuf::from(p);
-        }
+        && !p.is_empty()
+    {
+        return PathBuf::from(p);
+    }
 
     let base = std::env::var("XDG_CACHE_HOME")
         .ok()
@@ -40,7 +41,7 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
 
     fs::write(&cache_path, &zsh_code)
         .with_context(|| format!("Failed to write cache: {}", cache_path.display()))?;
- 
+
     zcompile_parallel(&modules, &cache_path);
 
     let loaded = modules
@@ -94,15 +95,15 @@ fn zcompile_parallel(modules: &[crate::core::types::DiscoveredModule], cache_pat
             ));
         }
     }
- 
+
     script.push_str(&format!(
         "zcompile -- '{}' 2>/dev/null &\n",
         sq_escape(&cache_path.to_string_lossy())
     ));
     script.push_str("wait\n");
 
-    let temp_path = std::env::temp_dir()
-        .join(format!("gaiety_zcompile_{}.zsh", std::process::id()));
+    let temp_path =
+        std::env::temp_dir().join(format!("gaiety_zcompile_{}.zsh", std::process::id()));
 
     if fs::write(&temp_path, &script).is_ok() {
         let _ = std::process::Command::new("zsh")

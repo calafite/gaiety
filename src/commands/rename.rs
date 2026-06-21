@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use colored::Colorize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +38,13 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         if dep_module.manifest.module.name == old_name {
             continue;
         }
-        if dep_module.manifest.module.deps.iter().any(|d| d.name == old_name) {
+        if dep_module
+            .manifest
+            .module
+            .deps
+            .iter()
+            .any(|d| d.name == old_name)
+        {
             let path = dep_module.path.join("module.toml");
             let content = fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read {}", path.display()))?;
@@ -55,7 +61,11 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         );
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Rename Module".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Rename Module".bold().cyan()
+    );
     println!(
         "  {:<10} {} {} {}",
         "name:".dimmed(),
@@ -113,18 +123,22 @@ pub fn run(dirs: String, old_name: String, new_name: String) -> Result<()> {
         )
     })?;
     tmp_guard.defuse();
- 
+
     for (tmp_path, target_path) in &dep_temps {
-        fs::rename(tmp_path, target_path).with_context(|| {
-            format!("Failed to commit dep TOML at {}", target_path.display())
-        })?;
+        fs::rename(tmp_path, target_path)
+            .with_context(|| format!("Failed to commit dep TOML at {}", target_path.display()))?;
     }
     dep_temp_guard.defuse();
 
     fs::remove_dir_all(old_dir)
         .with_context(|| format!("Failed to remove original dir: {}", old_dir.display()))?;
 
-    println!("{} renamed '{}' → '{}'\n", "✓".bold().green(), old_name, new_name);
+    println!(
+        "{} renamed '{}' → '{}'\n",
+        "✓".bold().green(),
+        old_name,
+        new_name
+    );
     Ok(())
 }
 
@@ -184,10 +198,9 @@ impl Drop for TempFilesGuard {
 }
 
 fn copy_dir(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir(dst)
-        .with_context(|| format!("Failed to create dir: {}", dst.display()))?;
-    for entry in fs::read_dir(src)
-        .with_context(|| format!("Failed to read dir: {}", src.display()))?
+    fs::create_dir(dst).with_context(|| format!("Failed to create dir: {}", dst.display()))?;
+    for entry in
+        fs::read_dir(src).with_context(|| format!("Failed to read dir: {}", src.display()))?
     {
         let entry = entry?;
         let src_path = entry.path();
@@ -237,9 +250,10 @@ fn rename_dep(content: &str, old_name: &str, new_name: &str) -> Result<String> {
     {
         for dep in deps.iter_mut() {
             if let Some(tbl) = dep.as_inline_table_mut()
-                && tbl.get("name").and_then(|v| v.as_str()) == Some(old_name) {
-                    tbl.insert("name", toml_edit::Value::from(new_name));
-                }
+                && tbl.get("name").and_then(|v| v.as_str()) == Some(old_name)
+            {
+                tbl.insert("name", toml_edit::Value::from(new_name));
+            }
         }
     }
 

@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use anyhow::{Result};
+use anyhow::Result;
 use colored::Colorize;
 use std::fs;
 use std::io::{self, Write};
@@ -12,12 +12,15 @@ pub fn run(dirs: String) -> Result<()> {
     let mut pruned_set = std::collections::HashSet::new();
 
     loop {
-        let mut in_degrees: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut in_degrees: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
         for m in &modules {
             if pruned_set.contains(&m.manifest.module.name) {
                 continue;
             }
-            in_degrees.entry(m.manifest.module.name.clone()).or_insert(0);
+            in_degrees
+                .entry(m.manifest.module.name.clone())
+                .or_insert(0);
             for dep in &m.manifest.module.deps {
                 if !pruned_set.contains(&dep.name) {
                     *in_degrees.entry(dep.name.clone()).or_insert(0) += 1;
@@ -33,11 +36,12 @@ pub fn run(dirs: String) -> Result<()> {
             }
             if m.manifest.module.implicit == Some(true)
                 && let Some(&deg) = in_degrees.get(name)
-                    && deg == 0 {
-                        to_prune.push(m.clone());
-                        pruned_set.insert(name.clone());
-                        found_any = true;
-                    }
+                && deg == 0
+            {
+                to_prune.push(m.clone());
+                pruned_set.insert(name.clone());
+                found_any = true;
+            }
         }
 
         if !found_any {
@@ -50,9 +54,17 @@ pub fn run(dirs: String) -> Result<()> {
         return Ok(());
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Prune Orphaned Dependencies".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Prune Orphaned Dependencies".bold().cyan()
+    );
     for m in &to_prune {
-        println!("  {:<14} {}", m.manifest.module.name.red(), m.path.display().to_string().dimmed());
+        println!(
+            "  {:<14} {}",
+            m.manifest.module.name.red(),
+            m.path.display().to_string().dimmed()
+        );
     }
     println!();
 
@@ -77,7 +89,11 @@ pub fn run(dirs: String) -> Result<()> {
         for dir in affected_dirs {
             super::rm::renumber_modules(&dir)?;
         }
-        println!("{} pruned {} module(s)\n", "✓".bold().green(), to_prune.len());
+        println!(
+            "{} pruned {} module(s)\n",
+            "✓".bold().green(),
+            to_prune.len()
+        );
     } else {
         println!("{} aborted\n", "!".bold().yellow());
     }

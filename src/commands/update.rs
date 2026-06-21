@@ -1,6 +1,6 @@
 use crate::commands::install::head_commit;
 use crate::core::Loader;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use colored::Colorize;
 use std::collections::HashMap;
 use std::fs;
@@ -39,7 +39,11 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
         }
     }
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Update Packages".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Update Packages".bold().cyan()
+    );
 
     let col_w = managed
         .iter()
@@ -68,10 +72,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
             args.push(b.clone());
         }
 
-        let out = Command::new("git")
-            .args(&args)
-            .env("LC_ALL", "C")
-            .output();
+        let out = Command::new("git").args(&args).env("LC_ALL", "C").output();
 
         match out {
             Ok(output) if output.status.success() => {
@@ -115,8 +116,9 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
         let tmp_dir = parent.join(format!(".gai_update_tmp_{}", std::process::id()));
 
         if tmp_dir.exists() {
-            fs::remove_dir_all(&tmp_dir)
-                .with_context(|| format!("Failed to remove stale temp dir: {}", tmp_dir.display()))?;
+            fs::remove_dir_all(&tmp_dir).with_context(|| {
+                format!("Failed to remove stale temp dir: {}", tmp_dir.display())
+            })?;
         }
 
         let mut args = vec!["clone".to_string()];
@@ -261,9 +263,10 @@ fn find_collection_subdir(clone_root: &Path, target_name: &str) -> Option<PathBu
         }
         if let Ok(content) = fs::read_to_string(&toml_path)
             && let Ok(doc) = content.parse::<DocumentMut>()
-                && doc["module"]["name"].as_str() == Some(target_name) {
-                    return Some(path);
-                }
+            && doc["module"]["name"].as_str() == Some(target_name)
+        {
+            return Some(path);
+        }
     }
     None
 }
@@ -285,7 +288,11 @@ fn sync_module_dir(
             sync_module_dir(&src_path, &dst_path, None, m)?;
         } else {
             fs::copy(&src_path, &dst_path).with_context(|| {
-                format!("Failed to copy {} → {}", src_path.display(), dst_path.display())
+                format!(
+                    "Failed to copy {} → {}",
+                    src_path.display(),
+                    dst_path.display()
+                )
             })?;
         }
     }
@@ -295,8 +302,13 @@ fn sync_module_dir(
         .with_context(|| format!("Failed to read {}", toml_path.display()))?;
 
     let src_entry = m.manifest.source.as_ref().unwrap();
-    let updated = rewrite_source_block(&content, &src_entry.url, src_entry.branch.as_deref(), new_pin)
-        .with_context(|| format!("Failed to rewrite [source] in {}", toml_path.display()))?;
+    let updated = rewrite_source_block(
+        &content,
+        &src_entry.url,
+        src_entry.branch.as_deref(),
+        new_pin,
+    )
+    .with_context(|| format!("Failed to rewrite [source] in {}", toml_path.display()))?;
 
     fs::write(&toml_path, updated)
         .with_context(|| format!("Failed to write {}", toml_path.display()))?;
@@ -341,15 +353,16 @@ fn require_git() -> Result<()> {
 }
 
 fn update_pin_in_toml(path: &Path, new_pin: &str) -> Result<()> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut doc: DocumentMut = content
         .parse()
         .with_context(|| format!("Failed to parse {}", path.display()))?;
     if let Some(source) = doc.get_mut("source")
-        && let Some(tbl) = source.as_table_mut() {
-            tbl["pin"] = toml_edit::value(new_pin);
-        }
+        && let Some(tbl) = source.as_table_mut()
+    {
+        tbl["pin"] = toml_edit::value(new_pin);
+    }
     fs::write(path, doc.to_string())
         .with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
@@ -406,7 +419,8 @@ mod tests {
     #[test]
     fn test_rewrite_source_block_update_pin() {
         let toml = "[module]\nname = \"bar\"\nversion = \"1.0.0\"\n\n[source]\nurl = \"https://github.com/x/y.git\"\npin = \"oldpin\"\n";
-        let result = rewrite_source_block(toml, "https://github.com/x/y.git", None, Some("newpin")).unwrap();
+        let result =
+            rewrite_source_block(toml, "https://github.com/x/y.git", None, Some("newpin")).unwrap();
         assert!(result.contains("newpin"));
         assert!(!result.contains("oldpin"));
         assert!(result.contains("https://github.com/x/y.git"));
@@ -415,7 +429,13 @@ mod tests {
     #[test]
     fn test_rewrite_source_block_with_branch() {
         let toml = "[module]\nname = \"baz\"\nversion = \"1.0.0\"\n";
-        let result = rewrite_source_block(toml, "https://github.com/x/z.git", Some("main"), Some("abc123")).unwrap();
+        let result = rewrite_source_block(
+            toml,
+            "https://github.com/x/z.git",
+            Some("main"),
+            Some("abc123"),
+        )
+        .unwrap();
         assert!(result.contains("branch"));
         assert!(result.contains("main"));
         assert!(result.contains("abc123"));

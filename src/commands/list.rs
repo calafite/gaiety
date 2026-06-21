@@ -1,5 +1,5 @@
-use crate::core::types::ModuleStatus;
 use crate::core::Loader;
+use crate::core::types::ModuleStatus;
 use anyhow::Result;
 use colored::Colorize;
 
@@ -7,7 +7,11 @@ pub fn run(dirs: String) -> Result<()> {
     let loader = Loader::new(&dirs)?;
     let modules = loader.get_modules()?;
 
-    println!("\n{} {}\n", "::".bold().cyan(), "Module Registry".bold().cyan());
+    println!(
+        "\n{} {}\n",
+        "::".bold().cyan(),
+        "Module Registry".bold().cyan()
+    );
 
     for m in modules {
         let name_padded = format!("{:<14}", m.manifest.module.name);
@@ -26,8 +30,9 @@ pub fn run(dirs: String) -> Result<()> {
             | ModuleStatus::SkippedMissingAnyCmd(_)
             | ModuleStatus::SkippedMissingDep(_) => format!("{:<8}", "skipped").yellow(),
             ModuleStatus::SkippedCycle(_) => format!("{:<8}", "cycle").red(),
-            ModuleStatus::SkippedBadConstraint(_)
-            | ModuleStatus::FailedManifest(_) => format!("{:<8}", "error").red(),
+            ModuleStatus::SkippedBadConstraint(_) | ModuleStatus::FailedManifest(_) => {
+                format!("{:<8}", "error").red()
+            }
         };
 
         let version_colored = format!("v{:<7}", m.manifest.module.version).dimmed();
@@ -37,7 +42,9 @@ pub fn run(dirs: String) -> Result<()> {
         } else {
             format!(
                 "[{}]",
-                m.manifest.module.deps
+                m.manifest
+                    .module
+                    .deps
                     .iter()
                     .map(|d| match &d.version {
                         Some(v) => format!("{}@{}", d.name, v),
@@ -64,7 +71,10 @@ pub fn run(dirs: String) -> Result<()> {
 
         match &m.status {
             ModuleStatus::SkippedMissingCmd(cmd) => {
-                println!("    {}", format!("↳ missing required command: {}", cmd).yellow());
+                println!(
+                    "    {}",
+                    format!("↳ missing required command: {}", cmd).yellow()
+                );
             }
             ModuleStatus::SkippedMissingAnyCmd(cmds) => {
                 println!(
@@ -91,10 +101,7 @@ pub fn run(dirs: String) -> Result<()> {
                 );
             }
             ModuleStatus::FailedManifest(detail) => {
-                println!(
-                    "    {}",
-                    format!("↳ manifest error: {}", detail).red()
-                );
+                println!("    {}", format!("↳ manifest error: {}", detail).red());
             }
             ModuleStatus::WarnDuplicateDep(dep) => {
                 println!(
