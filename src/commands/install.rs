@@ -337,7 +337,7 @@ fn install_collection(
     }
 
     let write_dir_index = loader.dirs.iter().position(|d| d == write_dir);
-    let mut prefix = next_prefix(modules, write_dir_index, write_dir);
+    let start_prefix = next_prefix(modules, write_dir_index, write_dir);
 
     let col_w = incoming
         .iter()
@@ -348,7 +348,7 @@ fn install_collection(
 
     let mut installed: Vec<String> = Vec::new();
 
-    for (name, subdir) in &incoming {
+    for (prefix, (name, subdir)) in (start_prefix..).zip(&incoming) {
         let dir_name = format!("{:02}_{}", prefix, name);
         let module_dir = write_dir.join(&dir_name);
 
@@ -370,13 +370,13 @@ fn install_collection(
         }
 
         println!(
-            "  {}  {}",
-            format!("{:<width$}", name.green(), width = col_w),
-            dir_name.dimmed()
+            "  {:<width$}  {}",
+            name.green(),
+            dir_name.dimmed(),
+            width = col_w
         );
 
         installed.push(name.clone());
-        prefix += 1;
     }
 
     println!();

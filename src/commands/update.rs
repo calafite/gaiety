@@ -63,7 +63,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
         let name = &m.manifest.module.name;
         let src = m.manifest.source.as_ref().unwrap();
 
-        print!("  {}  ", format!("{:<width$}", name.green(), width = col_w));
+        print!("  {:<width$}  ", name.green(), width = col_w);
 
         let path_str = m.path.to_string_lossy().into_owned();
         let mut args = vec!["-C".to_string(), path_str, "pull".to_string()];
@@ -146,9 +146,10 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                 for m in group {
                     let name = &m.manifest.module.name;
                     println!(
-                        "  {}  {}",
-                        format!("{:<width$}", name.green(), width = col_w),
-                        "clone failed".bold().red()
+                        "  {:<width$}  {}",
+                        name.green(),
+                        "clone failed".bold().red(),
+                        width = col_w
                     );
                     eprintln!("    {}", stderr.trim());
                     failed += 1;
@@ -160,9 +161,10 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
                 for m in group {
                     let name = &m.manifest.module.name;
                     println!(
-                        "  {}  {}",
-                        format!("{:<width$}", name.green(), width = col_w),
-                        "clone failed".bold().red()
+                        "  {:<width$}  {}",
+                        name.green(),
+                        "clone failed".bold().red(),
+                        width = col_w
                     );
                     eprintln!("    {}", e);
                     failed += 1;
@@ -176,7 +178,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
 
         for m in group {
             let name = &m.manifest.module.name;
-            print!("  {}  ", format!("{:<width$}", name.green(), width = col_w));
+            print!("  {:<width$}  ", name.green(), width = col_w);
 
             if !clone_ok {
                 continue;
