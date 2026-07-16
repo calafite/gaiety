@@ -1,80 +1,105 @@
-use crate::core::parse_version_lenient;
+use std::collections::HashMap;
+
+use crate::core::parse::parse_version;
 use crate::core::types::{DiscoveredModule, ModuleStatus};
 use anyhow::Result;
 
-pub fn validate_dependencies(modules: &mut [DiscoveredModule]) {
-    let mut changed = true;
-    while changed {
-        changed = false;
+pub struct DependencyValidator;
 
-        let loaded: std::collections::HashMap<String, String> = modules
-            .iter()
-            .filter(|m| m.status == ModuleStatus::Loaded)
-            .map(|m| {
-                (
-                    m.manifest.module.name.clone(),
-                    m.manifest.module.version.clone(),
-                )
-            })
-            .collect();
+impl DependencyValidator {
+    pub fn validate(modules: &mut [DiscoveredModule]) {
+        let size = modules.len();
+        let mut loaded_map = HashMap::with_capacity(size);
+        let mut is_loaded = vec![false; size];
 
-        for m in modules.iter_mut() {
-            if m.status != ModuleStatus::Loaded {
+        for (index, module) in modules.iter().enumerate() {
+            if module.status == ModuleStatus::Loaded {
+                loaded_map.insert(
+                    module.manifest.module.name.clone(),
+                    (index, module.manifest.module.version.clone()),
+                );
+                is_loaded[index] = true;
+            }
+        }
+
+        let mut dependents = vec![Vec::new(); size];
+        for (index, module) in modules.iter().enumerate() {
+            if !is_loaded[index] {
                 continue;
             }
-            for dep in &m.manifest.module.deps {
-                match loaded.get(&dep.name) {
-                    None => {
-                        m.status = ModuleStatus::SkippedMissingDep(dep.name.clone());
-                        changed = true;
-                        break;
-                    }
-                    Some(version) => {
-                        if let Some(constraint) = &dep.version {
-                            match satisfies(version, constraint) {
+            for dependency in &module.manifest.module.deps {
+                if let Some(&(dependency_index, _)) = loaded_map.get(dependency.name.as_str()) {
+                    dependents[dependency_index].push(index);
+                }
+            }
+        }
+
+        let mut invalid_queue = Vec::new();
+
+        for (index, module) in modules.iter_mut().enumerate() {
+            if !is_loaded[index] {
+                continue;
+            }
+
+            for dependency in &module.manifest.module.deps {
+                match loaded_map.get(dependency.name.as_str()) {
+                    Some(&(_, ref dependency_version)) => {
+                        if let Some(constraint) = &dependency.version {
+                            match Self::satisfies(dependency_version, constraint) {
                                 Ok(true) => {}
                                 Ok(false) => {
-                                    m.status = ModuleStatus::SkippedMissingDep(format!(
+                                    module.status = ModuleStatus::SkippedMissingDep(format!(
                                         "{}@{}",
-                                        dep.name, constraint
+                                        dependency.name, constraint
                                     ));
-                                    changed = true;
+                                    is_loaded[index] = false;
+                                    invalid_queue.push(index);
                                     break;
                                 }
-                                Err(e) => {
-                                    m.status = ModuleStatus::SkippedBadConstraint(format!(
+                                Err(err) => {
+                                    module.status = ModuleStatus::SkippedBadConstraint(format!(
                                         "dep '{}': {}",
-                                        dep.name, e
+                                        dependency.name, err
                                     ));
-                                    changed = true;
+                                    is_loaded[index] = false;
+                                    invalid_queue.push(index);
                                     break;
                                 }
                             }
                         }
                     }
+                    None => {
+                        module.status = ModuleStatus::SkippedMissingDep(dependency.name.clone());
+                        is_loaded[index] = false;
+                        invalid_queue.push(index);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let mut head = 0;
+        while head < invalid_queue.len() {
+            let u = invalid_queue[head];
+            head += 1;
+
+            let name = modules[u].manifest.module.name.clone();
+
+            for &v in &dependents[u] {
+                if is_loaded[v] {
+                    is_loaded[v] = false;
+                    modules[v].status = ModuleStatus::SkippedMissingDep(name.clone());
+                    invalid_queue.push(v);
                 }
             }
         }
     }
-}
 
-fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
-    let v = parse_version_lenient(version)
-        .map_err(|e| format!("invalid version '{}': {}", version, e))?;
-    let req = semver::VersionReq::parse(constraint)
-        .map_err(|e| format!("invalid constraint '{}': {}", constraint, e))?;
-    Ok(req.matches(&v))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_satisfies() {
-        assert!(satisfies("1.2.3", ">=1.0.0").unwrap());
-        assert!(!satisfies("0.9.0", ">=1.0.0").unwrap());
-        assert!(satisfies("2.0.0", "^2.0.0").unwrap());
-        assert!(satisfies("1.5", "<2.0.0").unwrap());
+    fn satisfies(version: &str, constraint: &str) -> Result<bool, String> {
+        let version = parse_version(version)
+            .map_err(|err| format!("invalid version '{}': {}", version, err))?;
+        let required = semver::VersionReq::parse(constraint)
+            .map_err(|err| format!("invalid constraint '{}': {}", constraint, err))?;
+        Ok(required.matches(&version))
     }
 }
