@@ -1,5 +1,8 @@
 use crate::core::types::{DiscoveredModule, ModuleStatus};
-use std::{collections::{BinaryHeap, HashMap}, u32};
+use std::{
+    collections::{BinaryHeap, HashMap},
+    u32,
+};
 
 pub struct Sorter;
 
@@ -22,7 +25,7 @@ impl Sorter {
 
     fn validate_dupes(modules: &mut [DiscoveredModule]) {
         for module in modules.iter_mut() {
-            let mut seen_dependencies: = Vec::with_capacity(module.manifest.module.deps.len());
+            let mut seen_dependencies = Vec::with_capacity(module.manifest.module.deps.len());
             for dependency in &module.manifest.module.deps {
                 let name = dependency.name.as_str();
                 if seen_dependencies.contains(&name) {
@@ -44,7 +47,6 @@ impl Sorter {
 
         let mut indegree = vec![0usize; size];
         let mut adjacency = vec![Vec::new(); size];
-
 
         for (index, module) in modules.iter().enumerate() {
             if Self::module_skip(module) {
@@ -70,10 +72,12 @@ impl Sorter {
     }
 
     fn module_skip(module: &DiscoveredModule) -> bool {
-        matches!(module.status, ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_))
+        matches!(
+            module.status,
+            ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_)
+        )
     }
 }
-
 
 // lightweight heap node
 #[derive(PartialEq, Eq)]
@@ -86,7 +90,9 @@ struct HeapNode<'a> {
 
 impl<'a> Ord for HeapNode<'a> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.dir_index.cmp(&self.dir_index)
+        other
+            .dir_index
+            .cmp(&self.dir_index)
             .then_with(|| other.prefix_order.cmp(&self.prefix_order))
             .then_with(|| other.name.cmp(self.name))
             .then_with(|| other.idx.cmp(&self.idx))
@@ -99,11 +105,14 @@ impl<'a> PartialOrd for HeapNode<'a> {
     }
 }
 
-
 struct KahnSort;
 
 impl KahnSort {
-    fn sort(modules: &[DiscoveredModule], mut indegree: Vec<usize>, adjacency: &[Vec<usize>]) -> Vec<usize> {
+    fn sort(
+        modules: &[DiscoveredModule],
+        mut indegree: Vec<usize>,
+        adjacency: &[Vec<usize>],
+    ) -> Vec<usize> {
         let size = modules.len();
         let make_node = |index: usize| -> HeapNode {
             let module = &modules[index];
@@ -111,11 +120,11 @@ impl KahnSort {
                 dir_index: module.dir_index,
                 prefix_order: module.prefix_order.unwrap_or(u32::MAX),
                 name: &module.manifest.module.name.as_str(),
-                idx: index
+                idx: index,
             }
         };
 
-        let mut heap: BinaryHeap<HeapNode> = (0..n)
+        let mut heap: BinaryHeap<HeapNode> = (0..size)
             .filter(|&index| indegree[index] == 0)
             .map(make_node)
             .collect();
@@ -125,7 +134,7 @@ impl KahnSort {
         while let Some(node) = heap.pop() {
             let index = node.idx;
             order.push(index);
-            for &j in &adjacency[i] {
+            for &j in &adjacency[index] {
                 indegree[j] -= 1;
                 if indegree[j] == 0 {
                     heap.push(make_node(j));
@@ -140,7 +149,11 @@ impl KahnSort {
 struct CycleHandler;
 
 impl CycleHandler {
-    fn handle(modules: &mut [DiscoveredModule], adjacency: &[Vec<usize>], mut order: Vec<usize>) -> Vec<usize> {
+    fn handle(
+        modules: &mut [DiscoveredModule],
+        adjacency: &[Vec<usize>],
+        mut order: Vec<usize>,
+    ) -> Vec<usize> {
         let size = modules.len();
 
         let mut is_cyclic = vec![true; size];
@@ -172,29 +185,41 @@ impl CycleHandler {
         order
     }
 
-    fn find_path(start: usize, adjacency: &[Vec<usize>], is_cyclic: &[bool], modules: &[DiscoveredModule]) -> Vec<String> {
+    fn find_path(
+        start: usize,
+        adjacency: &[Vec<usize>],
+        is_cyclic: &[bool],
+        modules: &[DiscoveredModule],
+    ) -> Vec<String> {
         let mut visited = vec![false; modules.len()];
         let mut stack = Vec::new();
 
-       if Self::dfs(start, start, adjacency, is_cyclic, &mut visited, &mut stack) {
-           let mut path: Vec<String> = stack
-               .iter()
-               .map(|&index| modules[index].manifest.module.name.clone())
-               .collect();
-           path.push(modules[start].manifest.module.name.clone());
-           path
-       } else {
-           let mut path = vec![modules[start].manifest.module.name.clone()];
-           for &j in &adjacency[start] {
-               if is_cyclic[j] {
-                   path.push(modules[j].manifest.module.name.clone());
-               }
-           }
-           path
-       }
+        if Self::dfs(start, start, adjacency, is_cyclic, &mut visited, &mut stack) {
+            let mut path: Vec<String> = stack
+                .iter()
+                .map(|&index| modules[index].manifest.module.name.clone())
+                .collect();
+            path.push(modules[start].manifest.module.name.clone());
+            path
+        } else {
+            let mut path = vec![modules[start].manifest.module.name.clone()];
+            for &j in &adjacency[start] {
+                if is_cyclic[j] {
+                    path.push(modules[j].manifest.module.name.clone());
+                }
+            }
+            path
+        }
     }
 
-    fn dfs(target: usize, current: usize, adjacency: &[Vec<usize>], is_cyclic: &[bool], visited: &mut [bool], stack: &mut Vec<usize>) -> bool {
+    fn dfs(
+        target: usize,
+        current: usize,
+        adjacency: &[Vec<usize>],
+        is_cyclic: &[bool],
+        visited: &mut [bool],
+        stack: &mut Vec<usize>,
+    ) -> bool {
         stack.push(current);
         for &next in &adjacency[current] {
             if !is_cyclic[next] {
@@ -213,7 +238,7 @@ impl CycleHandler {
         }
         stack.pop();
         false
-   }
+    }
 }
 
 struct Reorderer;
