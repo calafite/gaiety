@@ -1,5 +1,5 @@
 use crate::core::Loader;
-use crate::core::manifest::{ApiMeta, Manifest};
+use crate::core::manifest::ApiMeta;
 use crate::core::types::{DiscoveredModule, ModuleStatus};
 use anyhow::Result;
 use std::collections::HashMap;
