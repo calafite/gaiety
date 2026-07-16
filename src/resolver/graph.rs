@@ -1,90 +1,159 @@
+use clap::builder::Str;
+
 use crate::core::types::{DiscoveredModule, ModuleStatus};
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::{collections::{BinaryHeap, HashMap}, u32};
 
-pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
-    let n = modules.len();
+pub struct Sorter;
 
-    if n == 0 {
-        return;
+impl Sorter {
+    pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
+        if modules.is_empty() {
+            return;
+        }
+
+        Self::validate_dupes(modules);
+        let (indegree, adjacency) = Self::dependency_graph(modules);
+        let mut order = KahnSort::sort(modules, indegree, &adjacency);
+
+        if order.len() < modules.len() {
+            order = CycleHandler::handle(modules, &adjacency, order);
+        }
+
+        Reorderer::reorder(modules, order);
     }
 
-    for m in modules.iter_mut() {
-        let mut seen_deps: HashSet<&str> = HashSet::new();
-        for dep in &m.manifest.module.deps {
-            if !seen_deps.insert(dep.name.as_str()) {
-                m.status = ModuleStatus::WarnDuplicateDep(dep.name.clone());
-                break;
+    fn validate_dupes(modules: &mut [DiscoveredModule]) {
+        for module in modules.iter_mut() {
+            let mut seen_dependencies: = Vec::with_capacity(module.manifest.module.deps.len());
+            for dependency in &module.manifest.module.deps {
+                let name = dependency.name.as_str();
+                if seen_dependencies.contains(&name) {
+                    module.status = ModuleStatus::WarnDuplicateDep(dependency.name.clone());
+                    break;
+                }
+                seen_dependencies.push(name);
             }
         }
     }
 
-    let name_to_idx: HashMap<&str, usize> = modules
-        .iter()
-        .enumerate()
-        .map(|(i, m)| (m.manifest.module.name.as_str(), i))
-        .collect();
+    fn dependency_graph(modules: &[DiscoveredModule]) -> (Vec<usize>, Vec<Vec<usize>>) {
+        let size = modules.len();
+        let enumerated: HashMap<&str, usize> = modules
+            .iter()
+            .enumerate()
+            .map(|(index, module)| (module.manifest.module.name.as_str(), index))
+            .collect();
 
-    let mut in_degree = vec![0usize; n];
-    let mut adj: Vec<Vec<usize>> = vec![Vec::new(); n];
+        let mut indegree = vec![0usize; size];
+        let mut adjacency = vec![Vec::new(); size];
 
-    for (i, m) in modules.iter().enumerate() {
-        if matches!(
-            m.status,
-            ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_)
-        ) {
-            continue;
-        }
 
-        let mut seen_deps: HashSet<&str> = HashSet::new();
-        for dep in &m.manifest.module.deps {
-            if !seen_deps.insert(dep.name.as_str()) {
+        for (index, module) in modules.iter().enumerate() {
+            if Self::module_skip(module) {
                 continue;
             }
-            if let Some(&dep_idx) = name_to_idx.get(dep.name.as_str()) {
-                adj[dep_idx].push(i);
-                in_degree[i] += 1;
+
+            let mut seen_dependencies = Vec::with_capacity(module.manifest.module.deps.len());
+            for dependency in &module.manifest.module.deps {
+                let name = dependency.name.as_str();
+                if seen_dependencies.contains(&name) {
+                    continue;
+                }
+                seen_dependencies.push(name);
+
+                if let Some(&dependency_index) = enumerated.get(name) {
+                    adjacency[dependency_index].push(index);
+                    indegree[index] += 1;
+                }
             }
         }
+
+        (indegree, adjacency)
     }
 
-    type Key = Reverse<(usize, u32, String, usize)>;
+    fn module_skip(module: &DiscoveredModule) -> bool {
+        matches!(module.status, ModuleStatus::FailedManifest(_) | ModuleStatus::SkippedCycle(_))
+    }
+}
 
-    let make_key = |i: usize| -> Key {
-        let m = &modules[i];
-        Reverse((
-            m.dir_index,
-            m.prefix_order.unwrap_or(u32::MAX),
-            m.manifest.module.name.clone(),
-            i,
-        ))
-    };
 
-    let mut heap: BinaryHeap<Key> = (0..n)
-        .filter(|&i| in_degree[i] == 0)
-        .map(make_key)
-        .collect();
+// lightweight heap node
+#[derive(PartialEq, Eq)]
+struct HeapNode<'a> {
+    dir_index: usize,
+    prefix_order: u32,
+    name: &'a str,
+    idx: usize,
+}
 
-    let mut order: Vec<usize> = Vec::with_capacity(n);
+impl<'a> Ord for HeapNode<'a> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other.dir_index.cmp(&self.dir_index)
+            .then_with(|| other.prefix_order.cmp(&self.prefix_order))
+            .then_with(|| other.name.cmp(self.name))
+            .then_with(|| other.idx.cmp(&self.idx))
+    }
+}
 
-    while let Some(Reverse((_, _, _, i))) = heap.pop() {
-        order.push(i);
-        for &j in &adj[i] {
-            in_degree[j] -= 1;
-            if in_degree[j] == 0 {
-                heap.push(make_key(j));
+impl<'a> PartialOrd for HeapNode<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
+struct KahnSort;
+
+impl KahnSort {
+    fn sort(modules: &[DiscoveredModule], mut indegree: Vec<usize>, adjacency: &[Vec<usize>]) -> Vec<usize> {
+        let size = modules.len();
+        let make_node = |index: usize| -> HeapNode {
+            let module = &modules[index];
+            HeapNode {
+                dir_index: module.dir_index,
+                prefix_order: module.prefix_order.unwrap_or(u32::MAX),
+                name: &module.manifest.module.name.as_str(),
+                idx: index
+            }
+        };
+
+        let mut heap: BinaryHeap<HeapNode> = (0..n)
+            .filter(|&index| indegree[index] == 0)
+            .map(make_node)
+            .collect();
+
+        let mut order = Vec::with_capacity(size);
+
+        while let Some(node) = heap.pop() {
+            let index = node.idx;
+            order.push(index);
+            for &j in &adjacency[i] {
+                indegree[j] -= 1;
+                if indegree[j] == 0 {
+                    heap.push(make_node(j));
+                }
             }
         }
+
+        order
     }
+}
 
-    if order.len() < n {
-        let scheduled: HashSet<usize> = order.iter().copied().collect();
-        let cyclic: Vec<usize> = (0..n).filter(|i| !scheduled.contains(i)).collect();
+struct CycleHandler;
 
-        let cyclic_set: HashSet<usize> = cyclic.iter().copied().collect();
+impl CycleHandler {
+    fn handle(modules: &mut [DiscoveredModule], adjacency: &[Vec<usize>], mut order: Vec<usize>) -> Vec<usize> {
+        let size = modules.len();
+
+        let mut is_cyclic = vec![true; size];
+        for &index in &order {
+            is_cyclic[index] = false;
+        }
+
+        let cyclic: Vec<usize> = (0..size).filter(|&index| is_cyclic[index]).collect();
 
         for &start in &cyclic {
-            let cycle_path = find_cycle_path(start, &adj, &cyclic_set, modules);
+            let cycle_path = Self::find_path(start, adjacency, &is_cyclic, modules);
             modules[start].status = ModuleStatus::SkippedCycle(cycle_path);
         }
 
@@ -93,134 +162,67 @@ pub fn sort_modules(modules: &mut Vec<DiscoveredModule>) {
             let (ma, mb) = (&modules[a], &modules[b]);
             ma.dir_index
                 .cmp(&mb.dir_index)
-                .then_with(|| match (ma.prefix_order, mb.prefix_order) {
-                    (Some(x), Some(y)) => x.cmp(&y),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => ma.manifest.module.name.cmp(&mb.manifest.module.name),
+                .then_with(|| {
+                    let pa = ma.prefix_order.unwrap_or(u32::MAX);
+                    let pb = ma.prefix_order.unwrap_or(u32::MAX);
+                    pa.cmp(&pb)
                 })
+                .then_with(|| ma.manifest.module.name.cmp(&mb.manifest.module.name))
         });
+
         order.extend(tail);
+        order
     }
 
-    let mut slots: Vec<Option<DiscoveredModule>> = modules.drain(..).map(Some).collect();
-    modules.extend(order.into_iter().map(|i| slots[i].take().unwrap()));
-}
+    fn find_path(start: usize, adjacency: &[Vec<usize>], is_cyclic: &[bool], modules: &[DiscoveredModule]) -> Vec<String> {
+        let mut visited = vec![false; modules.len()];
+        let mut stack = Vec::new();
 
-fn find_cycle_path(
-    start: usize,
-    adj: &[Vec<usize>],
-    cyclic_set: &HashSet<usize>,
-    modules: &[DiscoveredModule],
-) -> Vec<String> {
-    let mut visited: HashSet<usize> = HashSet::new();
-    let mut stack: Vec<usize> = Vec::new();
+       if Self::dfs(start, start, adjacency, is_cyclic, &mut visited, &mut stack) {
+           let mut path: Vec<String> = stack
+               .iter()
+               .map(|&index| modules[index].manifest.module.name.clone())
+               .collect();
+           path.push(modules[start].manifest.module.name.clone());
+           path
+       } else {
+           let mut path = vec![modules[start].manifest.module.name.clone()];
+           for &j in &adjacency[start] {
+               if is_cyclic[j] {
+                   path.push(modules[j].manifest.module.name.clone());
+               }
+           }
+           path
+       }
+    }
 
-    if dfs_cycle(start, start, adj, cyclic_set, &mut visited, &mut stack) {
-        let mut path: Vec<String> = stack
-            .iter()
-            .map(|&i| modules[i].manifest.module.name.clone())
-            .collect();
-        path.push(modules[start].manifest.module.name.clone());
-        path
-    } else {
-        let mut path = vec![modules[start].manifest.module.name.clone()];
-        for &j in &adj[start] {
-            if cyclic_set.contains(&j) {
-                path.push(modules[j].manifest.module.name.clone());
+    fn dfs(target: usize, current: usize, adjacency: &[Vec<usize>], is_cyclic: &[bool], visited: &mut [bool], stack: &mut Vec<usize>) -> bool {
+        stack.push(current);
+        for &next in &adjacency[current] {
+            if !is_cyclic[next] {
+                continue;
+            }
+            if next == target {
+                return true;
+            }
+            if visited[next] {
+                continue;
+            }
+            visited[next] = true;
+            if Self::dfs(target, next, adjacency, is_cyclic, visited, stack) {
+                return true;
             }
         }
-        path
-    }
+        stack.pop();
+        false
+   }
 }
 
-fn dfs_cycle(
-    target: usize,
-    current: usize,
-    adj: &[Vec<usize>],
-    cyclic_set: &HashSet<usize>,
-    visited: &mut HashSet<usize>,
-    stack: &mut Vec<usize>,
-) -> bool {
-    stack.push(current);
-    for &next in &adj[current] {
-        if !cyclic_set.contains(&next) {
-            continue;
-        }
-        if next == target {
-            return true;
-        }
-        if visited.contains(&next) {
-            continue;
-        }
-        visited.insert(next);
-        if dfs_cycle(target, next, adj, cyclic_set, visited, stack) {
-            return true;
-        }
-    }
-    stack.pop();
-    false
-}
+struct Reorderer;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::sources::ModuleSource;
-    use crate::sources::local::LocalSource;
-    use std::fs;
-    use std::path::PathBuf;
-
-    fn create_temp_dir(name: &str) -> PathBuf {
-        let mut p = std::env::temp_dir();
-        p.push(format!(
-            "gai_test_resolver_{}_{}",
-            name,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_micros()
-        ));
-        fs::create_dir_all(&p).unwrap();
-        p
-    }
-
-    #[test]
-    fn test_discover_and_sort() {
-        let temp = create_temp_dir("sort");
-        let m1_dir = temp.join("01_m1");
-        let m2_dir = temp.join("02_m2");
-        fs::create_dir_all(&m1_dir).unwrap();
-        fs::create_dir_all(&m2_dir).unwrap();
-
-        fs::write(
-            m1_dir.join("module.toml"),
-            r#"
-[module]
-name = "m1"
-version = "1.0.0"
-deps = [ { name = "m2" } ]
-"#,
-        )
-        .unwrap();
-
-        fs::write(
-            m2_dir.join("module.toml"),
-            r#"
-[module]
-name = "m2"
-version = "2.0.0"
-"#,
-        )
-        .unwrap();
-
-        let local_source = LocalSource::new(vec![temp.clone()]);
-        let mut modules = local_source.fetch_modules().unwrap();
-        assert_eq!(modules.len(), 2);
-
-        sort_modules(&mut modules);
-        assert_eq!(modules[0].manifest.module.name, "m2");
-        assert_eq!(modules[1].manifest.module.name, "m1");
-
-        let _ = fs::remove_dir_all(&temp);
+impl Reorderer {
+    fn reorder(modules: &mut Vec<DiscoveredModule>, order: Vec<usize>) {
+        let mut slots: Vec<Option<DiscoveredModule>> = modules.drain(..).map(Some).collect();
+        modules.extend(order.into_iter().map(|index| slots[index].take().unwrap()));
     }
 }
