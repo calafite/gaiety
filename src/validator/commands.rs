@@ -3,13 +3,13 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 pub fn validate_commands(modules: &mut [DiscoveredModule]) {
-    for m in modules.iter_mut() {
-        if m.status != ModuleStatus::Loaded {
+    for module in modules.iter_mut() {
+        if module.status != ModuleStatus::Loaded {
             continue;
         }
-        for cmd in &m.manifest.module.requires_cmd {
+        for cmd in &module.manifest.module.requires_cmd {
             if !has_command(cmd) {
-                m.status = ModuleStatus::SkippedMissingCmd(cmd.clone());
+                module.status = ModuleStatus::SkippedMissingCmd(cmd.clone());
                 break;
             }
         }
@@ -17,13 +17,13 @@ pub fn validate_commands(modules: &mut [DiscoveredModule]) {
 }
 
 pub fn validate_any_commands(modules: &mut [DiscoveredModule]) {
-    for m in modules.iter_mut() {
-        if m.status != ModuleStatus::Loaded {
+    for module in modules.iter_mut() {
+        if module.status != ModuleStatus::Loaded {
             continue;
         }
-        let cmds = &m.manifest.module.requires_any_cmd;
+        let cmds = &module.manifest.module.requires_any_cmd;
         if !cmds.is_empty() && !cmds.iter().any(|cmd| has_command(cmd)) {
-            m.status = ModuleStatus::SkippedMissingAnyCmd(cmds.clone());
+            module.status = ModuleStatus::SkippedMissingAnyCmd(cmds.clone());
         }
     }
 }
@@ -31,24 +31,24 @@ pub fn validate_any_commands(modules: &mut [DiscoveredModule]) {
 pub fn check_completions(modules: &[DiscoveredModule]) -> Vec<String> {
     let all_content: String = modules
         .iter()
-        .filter(|m| m.status == ModuleStatus::Loaded)
-        .filter_map(|m| {
-            let init_path = m.path.join("init.zsh");
+        .filter(|module| module.status == ModuleStatus::Loaded)
+        .filter_map(|module| {
+            let init_path = module.path.join("init.zsh");
             std::fs::read_to_string(init_path).ok()
         })
         .collect();
 
     let mut warnings = Vec::new();
-    for m in modules {
-        if m.status != ModuleStatus::Loaded {
+    for module in modules {
+        if module.status != ModuleStatus::Loaded {
             continue;
         }
-        for comp_fn in m.manifest.api.completions.values() {
+        for comp_fn in module.manifest.api.completions.values() {
             if !is_function_defined(&all_content, comp_fn) {
                 warnings.push(format!(
                     "module '{}': completion function '{}' not found in any init.zsh \
                      (if it is defined in a sourced sub-file, this warning can be ignored)",
-                    m.manifest.module.name, comp_fn
+                    module.manifest.module.name, comp_fn
                 ));
             }
         }
@@ -86,7 +86,7 @@ fn is_function_defined(content: &str, fn_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::*;m
 
     #[test]
     fn test_is_function_defined() {
