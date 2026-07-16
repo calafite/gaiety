@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::collections::HashMap;
 
+const DEFAULT_DESCRIPTION: &str = "<manifest could not be parsed>";
+
 #[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct Manifest {
     pub module: ModuleMeta,
@@ -15,7 +17,7 @@ impl Manifest {
         Self {
             module: ModuleMeta {
                 name: dir_name,
-                description: Some("<manifest could not be parsed>".to_string()),
+                description: Some(DEFAULT_DESCRIPTION.to_string()),
                 version: "0.0.0".to_string(),
                 deps: Vec::new(),
                 tags: Vec::new(),
