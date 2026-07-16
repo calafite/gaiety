@@ -1,5 +1,3 @@
-use clap::builder::Str;
-
 use crate::core::types::{DiscoveredModule, ModuleStatus};
 use std::{collections::{BinaryHeap, HashMap}, u32};
 
