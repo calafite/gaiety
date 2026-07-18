@@ -1,6 +1,6 @@
 # gaiety
 
-Minimalist zsh runtime module loader. Write modular shell config, declare dependencies and public APIs in manifests. Gaiety handles load order, validation and cleanup.
+Minimalist zsh runtime module loader. Write modular shell configuration, declare dependencies and public APIs in manifests. Gaiety handles load order, validation and cleanup.
 
 ---
 
@@ -68,8 +68,9 @@ variables = []
 # aliases = { top = "btop" }
 # completions = { "lt" = "_rt_comp_dirs" }
 
-# defer sourcing until first use ~ see lazy loading below
-defer_on_cmd = false
+[load]
+# load_mode can be "eager", "lazy", or "event"
+load_mode = "lazy"
 
 # managed by gai install ~ do not edit manually
 # [source]
@@ -151,11 +152,11 @@ gai path <name>             print the path to a module's init.zsh
     ↳ none of these commands found: sk
 ```
 
-Modules with `defer_on_cmd = true` show as `lazy` rather than `loaded`.
+Modules with `load_mode = "lazy"` show as `lazy` rather than `loaded`.
 
 ### gai info
 
-Shows full metadata for a single module, including whether it is lazy-loaded.
+Shows full metadata for a single module, including its configured load mode.
 
 ```text
 :: Module: list
@@ -167,7 +168,7 @@ Shows full metadata for a single module, including whether it is lazy-loaded.
   version        1.0.0
   deps           -
   tags           -
-  lazy           no
+  load mode      lazy
 
   Public API
     functions:
@@ -179,7 +180,7 @@ Shows full metadata for a single module, including whether it is lazy-loaded.
       help_ls
 ```
 
-A lazy module shows `lazy  yes` and its `init.zsh` is not sourced until one of its declared functions is first called.
+A lazy module shows `load mode      lazy` and its `init.zsh` is not sourced until one of its declared functions is first called.
 
 ### gai browse
 
@@ -249,7 +250,7 @@ gai new mything
 #          03_mything/init.zsh
 ```
 
-New modules are created with `defer_on_cmd = true` by default. Remove or set to `false` if the module needs to run code at shell startup (e.g. setting variables, running `eval "$(tool init zsh)"`, or setting up keybindings).
+New modules are created with `load_mode = "lazy"` by default. Change to `"eager"` if the module needs to run code eagerly at shell startup (e.g. setting variables, running `eval "$(tool init zsh)"`, or setting up keybindings).
 
 Use `--target` to write to a specific directory:
 
@@ -299,25 +300,29 @@ fzf_fm                   0.341 ms  █
 Total                   18.857 ms
 ```
 
-Times are color-coded: green under 1 ms, yellow 1-5 ms, red above 5 ms. Lazy modules are shown in blue with a `(def)` suffix, their time reflects the one-time cost paid on first use, not at shell startup.
+Times are color-coded: green under 1 ms, yellow 1-5 ms, red above 5 ms. Non-eager modules are shown in blue with a `(def)` suffix, their time reflects the one-time cost paid on first use, not at shell startup.
 
 Use `gai profile` to identify slow modules and decide which ones to make lazy.
 
 ---
 
-## Lazy loading
+## Loading modes
 
-Setting `defer_on_cmd = true` in `[api]` tells gaiety not to source the module's `init.zsh` at shell startup. Instead, thin stub functions are generated for every name in `functions`, `aliases`, and `completions`. The first time any of those names is invoked, the real `init.zsh` is sourced and the call is forwarded transparently.
+Setting `load_mode = "lazy"` in `[load]` tells gaiety not to source the module's `init.zsh` at shell startup. Instead, thin stub functions are generated for every name in `functions`, `aliases`, and `completions`. The first time any of those names is invoked, the real `init.zsh` is sourced and the call is forwarded transparently.
 
 ```toml
 [api]
 functions = ["ls", "ll", "la"]
-defer_on_cmd = true
+
+[load]
+load_mode = "lazy"
 ```
 
-This is safe for modules that only define functions or aliases. It is **not** appropriate for modules that need to run code eagerly at startup; for example, modules that export variables, call `eval "$(tool init zsh)"`, or set up keybindings. Those modules should use `defer_on_cmd = false`.
+This is safe for modules that only define functions or aliases. It is **not** appropriate for modules that need to run code eagerly at startup; for example, modules that export variables, call `eval "$(tool init zsh)"`, or set up keybindings. Those modules should use `load_mode = "eager"`.
 
-`gai list` shows lazy modules with the status `lazy`. `gai info <name>` shows `lazy  yes` in the metadata block. `gai profile` marks lazy modules with `(def)` and reports their deferred source time.
+Setting `load_mode = "event"` is for modules that subscribe to specific system events (future feature).
+
+`gai list` shows lazy modules with the status `lazy`. `gai info <name>` shows `load mode      lazy` in the metadata block. `gai profile` marks non-eager modules with `(def)` and reports their deferred source time.
 
 ---
 
