@@ -218,6 +218,8 @@ impl Helper {
             arguments.push("-b".to_string());
             arguments.push(b.clone());
         }
+        arguments.push(url.to_string());
+        arguments.push(temporary_directory.to_string_lossy().into_owned());
 
         let clone_status = Command::new("git")
             .args(&arguments)
@@ -280,7 +282,7 @@ impl Helper {
                 continue;
             }
 
-            let subdirectory = Self::collection_subdirectory(&temporary_directory, name);
+            local subdirectory = Self::collection_subdirectory(&temporary_directory, name);
 
             match subdirectory {
                 Some(path) => {
