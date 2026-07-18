@@ -82,12 +82,6 @@ pub fn repo_to_module(repo_name: &str) -> String {
     string
 }
 
-pub fn name_valid(name: &str) -> bool {
-    let mut chars = name.chars();
-    chars.next().map_or(false, crate::core::common::valid_fn)
-        && chars.all(crate::core::common::valid_fn)
-}
-
 pub fn head_commit(directory: &Path) -> Option<String> {
     let output = Command::new("git")
         .arg("-C")
@@ -259,7 +253,7 @@ impl Helper {
         let fallback_module_name = || repo_to_module(&parsed.repository);
         let module_name = name_override.unwrap_or_else(fallback_module_name);
 
-        if !name_valid(&module_name) {
+        if !crate::core::common::name_valid(&module_name) {
             bail!(
                 "Derived module name '{}' is not valid (must match [a-zA-Z_][a-zA-Z0-9_]*).\n  Use --name to provide a valid name.",
                 module_name
@@ -282,7 +276,7 @@ impl Helper {
         let matches_directory = |captured_directory: &PathBuf| captured_directory == directory;
         let write_index = loader.dirs.iter().position(matches_directory);
 
-        let max_prefix = Helper::next_prefix(modules, write_index, directory);
+        let max_prefix = crate::core::common::next_prefix(modules, write_index, directory);
         let directory_name = format!("{:02}_{}", max_prefix, module_name);
         let module_directory = directory.join(&directory_name);
 
@@ -376,7 +370,7 @@ impl Helper {
                 || format!("Failed to read module name from {}", subdir.display());
             let name = Self::toml_name(&manifest_path).with_context(read_error_context)?;
 
-            if !name_valid(&name) {
+            if !crate::core::common::name_valid(&name) {
                 bail!(
                     "Module name '{}' in {} is not valid (must match [a-zA-Z_][a-zA-Z0-9_]*).",
                     name,
@@ -415,7 +409,7 @@ impl Helper {
         let matches_directory = |captured_directory: &PathBuf| captured_directory == directory;
         let write_index = loader.dirs.iter().position(matches_directory);
 
-        let start_prefix = Self::next_prefix(modules, write_index, directory);
+        let start_prefix = crate::core::common::next_prefix(modules, write_index, directory);
 
         let name_length = |(incoming_name, _subdirectory): &(String, &Path)| incoming_name.len();
         let column_width = incoming.iter().map(name_length).max().unwrap_or(12).max(12);
@@ -561,26 +555,6 @@ impl Helper {
             .collect();
         directories.sort();
         directories
-    }
-
-    fn next_prefix(
-        modules: &[DiscoveredModule],
-        write_index: Option<usize>,
-        directory: &Path,
-    ) -> u32 {
-        let filter_by_directory = |module: &&DiscoveredModule| match write_index {
-            Some(index) => module.dir_index == index,
-            None => module.path.parent() == Some(directory),
-        };
-        let get_prefix_order = |module: &DiscoveredModule| module.prefix_order;
-
-        modules
-            .iter()
-            .filter(filter_by_directory)
-            .filter_map(get_prefix_order)
-            .max()
-            .unwrap_or(0)
-            + 1
     }
 
     fn copy_dir(source: &Path, destination: &Path) -> Result<()> {
@@ -745,11 +719,11 @@ mod tests {
 
     #[test]
     fn test_is_valid_name() {
-        assert!(name_valid("zsh_syntax_highlighting"));
-        assert!(name_valid("_plugin"));
-        assert!(!name_valid("123bad"));
-        assert!(!name_valid("has-dash"));
-        assert!(!name_valid(""));
+        assert!(crate::core::common::name_valid("zsh_syntax_highlighting"));
+        assert!(crate::core::common::name_valid("_plugin"));
+        assert!(!crate::core::common::name_valid("123bad"));
+        assert!(!crate::core::common::name_valid("has-dash"));
+        assert!(!crate::core::common::name_valid(""));
     }
 
     #[test]

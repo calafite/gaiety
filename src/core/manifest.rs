@@ -47,7 +47,7 @@ pub struct ModuleMeta {
     pub description: Option<String>,
     pub version: String,
     #[serde(default)]
-    pub deps: Vec<Dep>,
+    pub deps: Vec<Dependency>,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -61,7 +61,7 @@ pub struct ModuleMeta {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct Dep {
+pub struct Dependency {
     pub name: String,
     pub version: Option<String>,
     pub source: Option<String>,
