@@ -11,7 +11,7 @@ impl CommandValidator {
                 continue;
             }
             for cmd in &module.manifest.module.requires_cmd {
-                if !has_command(cmd) {
+                if !Self::has_cmd(cmd) {
                     module.status = ModuleStatus::SkippedMissingCmd(cmd.clone());
                     break;
                 }
@@ -25,7 +25,7 @@ impl CommandValidator {
                 continue;
             }
             let cmds = &module.manifest.module.requires_any_cmd;
-            if !cmds.is_empty() && !cmds.iter().any(|cmd| has_command(cmd)) {
+            if !cmds.is_empty() && !cmds.iter().any(|cmd| Self::has_cmd(cmd)) {
                 module.status = ModuleStatus::SkippedMissingAnyCmd(cmds.clone());
             }
         }
@@ -47,7 +47,7 @@ impl CommandValidator {
                 continue;
             }
             for comp_fn in module.manifest.api.completions.values() {
-                if !is_function_defined(&all_content, comp_fn) {
+                if !Self::is_fn(&all_content, comp_fn) {
                     warnings.push(format!(
                         "module '{}': completion function '{}' not found in any init.zsh \
                         (if it is defined in a sourced sub-file, this warning can be ignored)",
@@ -90,14 +90,14 @@ impl CommandValidator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;m
+    use crate::validator::commands::CommandValidator;
 
     #[test]
     fn test_is_function_defined() {
-        assert!(is_function_defined("my_func() {\n}", "my_func"));
-        assert!(is_function_defined("my_func () {\n}", "my_func"));
-        assert!(is_function_defined("function my_func {\n}", "my_func"));
-        assert!(!is_function_defined("# my_func() {\n}", "my_func"));
-        assert!(!is_function_defined("other_func() {\n}", "my_func"));
+        assert!(CommandValidator::is_fn("my_func() {\n}", "my_func"));
+        assert!(CommandValidator::is_fn("my_func () {\n}", "my_func"));
+        assert!(CommandValidator::is_fn("function my_func {\n}", "my_func"));
+        assert!(!CommandValidator::is_fn("# my_func() {\n}", "my_func"));
+        assert!(!CommandValidator::is_fn("other_func() {\n}", "my_func"));
     }
 }

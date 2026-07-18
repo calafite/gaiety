@@ -88,7 +88,7 @@ impl Helper {
     }
 
     fn validate_version(version: &str) -> ModuleStatus {
-        if crate::core::parse_version_lenient(version).is_ok() {
+        if crate::core::parse::parse_version(version).is_ok() {
             ModuleStatus::Loaded
         } else {
             ModuleStatus::FailedManifest(format!(
