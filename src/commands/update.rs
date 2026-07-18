@@ -75,7 +75,7 @@ pub fn run(dirs: String, module_name: Option<String>) -> Result<()> {
         .partition(|module| module.path.join(".git").exists());
 
     for module in &git_modules {
-        match Helper::update_module(*module, column_width) {
+        match Helper::update_module(module, column_width) {
             UpdateStatus::UpToDate => {
                 println!("{}", "up to date".dimmed());
                 already_current += 1;
@@ -163,7 +163,7 @@ impl Helper {
             Ok(output) if output.status.success() => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 if stdout.contains("Already up to date") || stdout.contains("Already up-to-date") {
-                    return UpdateStatus::UpToDate;
+                    UpdateStatus::UpToDate
                 } else {
                     if let Some(pin) = head_commit(&module.path) {
                         let toml_path = &module.path.join("module.toml");
@@ -171,14 +171,14 @@ impl Helper {
                             return UpdateStatus::Failed(format!("Failed to update pin: {}", err));
                         }
                     }
-                    return UpdateStatus::Updated;
+                    UpdateStatus::Updated
                 }
             }
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                return UpdateStatus::Failed(stderr.trim().to_string());
+                UpdateStatus::Failed(stderr.trim().to_string())
             }
-            Err(err) => return UpdateStatus::Failed(err.to_string()),
+            Err(err) => UpdateStatus::Failed(err.to_string()),
         }
     }
 
@@ -327,13 +327,11 @@ impl Helper {
                 continue;
             }
 
-            if let Ok(content) = fs::read_to_string(&toml_path) {
-                if let Ok(document) = content.parse::<DocumentMut>() {
-                    if document["module"]["name"].as_str() == Some(target_name) {
+            if let Ok(content) = fs::read_to_string(&toml_path)
+                && let Ok(document) = content.parse::<DocumentMut>()
+                    && document["module"]["name"].as_str() == Some(target_name) {
                         return Some(path);
                     }
-                }
-            }
         }
         None
     }
@@ -354,7 +352,7 @@ impl Helper {
 
             if source_path.is_dir() {
                 fs::create_dir_all(&destination_path)?;
-                Self::synchronise_modules(&source_path, &destination_path, None, module);
+                Self::synchronise_modules(&source_path, &destination_path, None, module)?;
             } else {
                 fs::copy(&source_path, &destination_path).with_context(|| {
                     format!(
@@ -418,11 +416,10 @@ impl Helper {
             .parse()
             .with_context(|| format!("Failed to parse {}", path.display()))?;
 
-        if let Some(source) = document.get_mut("source") {
-            if let Some(table) = source.as_table_mut() {
+        if let Some(source) = document.get_mut("source")
+            && let Some(table) = source.as_table_mut() {
                 table["pin"] = toml_edit::value(new_pin);
             }
-        }
 
         fs::write(path, document.to_string())
             .with_context(|| format!("Failed to write {}", path.display()))?;
