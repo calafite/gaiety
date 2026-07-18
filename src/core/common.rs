@@ -20,7 +20,10 @@ pub fn require_git() -> Result<()> {
 
 pub fn name_valid(name: &str) -> bool {
     let mut chars = name.chars();
-    chars.next().map_or(false, valid_fn) && chars.all(valid_fn)
+    chars
+        .next()
+        .map_or(false, |c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(valid_fn)
 }
 
 pub fn next_prefix(
