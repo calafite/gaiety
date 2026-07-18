@@ -1,9 +1,12 @@
-use std::path::PathBuf;
 use crate::resolver::graph::Sorter;
-use anyhow::Result;
 use crate::validator::commands::CommandValidator;
 use crate::validator::semver::DependencyValidator;
-use crate::{core::types::DiscoveredModule, sources::{ModuleSource, local::LocalSource}};
+use crate::{
+    core::types::DiscoveredModule,
+    sources::{ModuleSource, local::LocalSource},
+};
+use anyhow::Result;
+use std::path::PathBuf;
 
 pub struct Loader {
     pub dirs: Vec<PathBuf>,
@@ -15,7 +18,7 @@ impl Loader {
             .split(':')
             .filter(|string| !string.is_empty())
             .map(Self::parse_validate)
-            .collect::<Result<Vec<_>>()?;
+            .collect::<Result<Vec<_>>>()?;
 
         if dirs.is_empty() {
             anyhow::bail!("no module directories specified");
@@ -34,7 +37,7 @@ impl Loader {
         Ok(modules)
     }
 
-    fn default_write(&self) -> &PathBuf {
+    pub fn default_write(&self) -> &PathBuf {
         self.dirs
             .last()
             .expect("Loader invariant violated: directories cannot be empty after initialization.")
@@ -52,7 +55,6 @@ impl Loader {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,7 +62,9 @@ mod tests {
     #[test]
     fn test_loader_new_empty_or_invalid() {
         assert!(Loader::is_err(&Loader::new("")));
-        assert!(Loader::is_err(&Loader::new("/nonexistent/path/gaiety/test")));
+        assert!(Loader::is_err(&Loader::new(
+            "/nonexistent/path/gaiety/test"
+        )));
     }
 
     impl Loader {
