@@ -1,9 +1,5 @@
 use crate::core::types::{DiscoveredModule, ModuleStatus};
-use std::{
-    collections::{BinaryHeap, HashMap},
-    u32,
-};
-
+use std::collections::{BinaryHeap, HashMap};
 pub struct Sorter;
 
 impl Sorter {
@@ -119,7 +115,7 @@ impl KahnSort {
             HeapNode {
                 dir_index: module.dir_index,
                 prefix_order: module.prefix_order.unwrap_or(u32::MAX),
-                name: &module.manifest.module.name.as_str(),
+                name: module.manifest.module.name.as_str(),
                 idx: index,
             }
         };
