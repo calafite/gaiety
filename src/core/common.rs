@@ -1,9 +1,10 @@
+use crate::core::types::DiscoveredModule;
 use anyhow::{Result, bail};
 use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
 
-use crate::core::types::DiscoveredModule;
+const DEFAULT_EXE_NAME: &str = "gaiety";
 
 pub fn require_git() -> Result<()> {
     let git_absent = Command::new("git")
@@ -44,6 +45,12 @@ pub fn next_prefix(
         .max()
         .unwrap_or(0)
         + 1
+}
+
+pub fn exe_path() -> String {
+    std::env::current_exe()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|_| DEFAULT_EXE_NAME.to_string())
 }
 
 pub fn temporary_name(tmp_type: &str) -> String {

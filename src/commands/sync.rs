@@ -41,7 +41,7 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
             .with_context(|| format!("Failed to create cache directory: {}", parent.display()))?;
 
         let lua_path = parent.join("wrapper.lua");
-        let bin = &crate::emitter::zsh::exe_path();
+        let bin = &crate::core::common::exe_path();
         let lua_code = include_str!("../templates/wrapper.lua").replace("{{GAIETY_BIN}}", bin);
         fs::write(&lua_path, &lua_code).with_context(|| {
             format!("Failed to write Lua wrapper cache: {}", lua_path.display())
