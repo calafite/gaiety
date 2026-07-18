@@ -124,7 +124,7 @@ impl Helper {
         s.replace('\'', r"'\''")
     }
 
-    fn partition_stages<'a>(modules: &'a [DiscoveredModule]) -> Vec<Vec<&'a DiscoveredModule>> {
+    fn partition_stages(modules: &[DiscoveredModule]) -> Vec<Vec<&DiscoveredModule>> {
         let mut stages: Vec<Vec<&DiscoveredModule>> = Vec::new();
         let mut named = HashMap::new();
 
