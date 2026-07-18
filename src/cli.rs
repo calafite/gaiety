@@ -1,4 +1,4 @@
-// use crate::commands::*;
+use crate::commands::*;
 use anyhow::Result;
 use clap::builder::styling::{AnsiColor, Effects, Styles};
 use clap::{Parser, Subcommand};
@@ -123,32 +123,30 @@ pub enum Commands {
     Profile,
 }
 
-pub fn execute(_cli: Cli) -> Result<()> {
-    todo!();
-
-    // match cli.command {
-    //     Commands::Init => init::run(cli.dirs),
-    //     Commands::Sync { output } => sync::run(cli.dirs, output),
-    //     Commands::Browse => browse::run(cli.dirs),
-    //     Commands::List => list::run(cli.dirs),
-    //     Commands::Info { module } => info::run(cli.dirs, module),
-    //     Commands::Path { module } => path::run(cli.dirs, module),
-    //     Commands::Install {
-    //         spec,
-    //         name,
-    //         branch,
-    //         target,
-    //     } => install::run(cli.dirs, spec, name, branch, target),
-    //     Commands::Update { module } => update::run(cli.dirs, module),
-    //     Commands::New { module, target } => new::run(cli.dirs, module, target),
-    //     Commands::Rm {
-    //         module,
-    //         dir,
-    //         recursive,
-    //     } => rm::run(cli.dirs, module, dir, recursive),
-    //     Commands::Prune => prune::run(cli.dirs),
-    //     Commands::Resolve => resolve::run(cli.dirs),
-    //     Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
-    //     Commands::Profile => profile::run(cli.dirs),
-    // }
+pub fn execute(cli: Cli) -> Result<()> {
+    match cli.command {
+        Commands::Init => init::run(cli.dirs),
+        Commands::Sync { output } => sync::run(cli.dirs, output),
+        Commands::Browse => browse::run(cli.dirs),
+        Commands::List => list::run(cli.dirs),
+        Commands::Info { module } => info::run(cli.dirs, module),
+        Commands::Path { module } => path::run(cli.dirs, module),
+        Commands::Install {
+            spec,
+            name,
+            branch,
+            target,
+        } => install::run(cli.dirs, spec, name, branch, target),
+        Commands::Update { module } => update::run(cli.dirs, module),
+        Commands::New { module, target } => new::run(cli.dirs, module, target),
+        Commands::Rm {
+            module,
+            dir,
+            recursive,
+        } => remove::run(cli.dirs, module, dir, recursive),
+        Commands::Prune => prune::run(cli.dirs),
+        Commands::Resolve => resolve::run(cli.dirs),
+        Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
+        Commands::Profile => profile::run(cli.dirs),
+    }
 }
