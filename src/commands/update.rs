@@ -282,7 +282,7 @@ impl Helper {
                 continue;
             }
 
-            local subdirectory = Self::collection_subdirectory(&temporary_directory, name);
+            let subdirectory = Self::collection_subdirectory(&temporary_directory, name);
 
             match subdirectory {
                 Some(path) => {
@@ -331,9 +331,10 @@ impl Helper {
 
             if let Ok(content) = fs::read_to_string(&toml_path)
                 && let Ok(document) = content.parse::<DocumentMut>()
-                    && document["module"]["name"].as_str() == Some(target_name) {
-                        return Some(path);
-                    }
+                && document["module"]["name"].as_str() == Some(target_name)
+            {
+                return Some(path);
+            }
         }
         None
     }
@@ -419,9 +420,10 @@ impl Helper {
             .with_context(|| format!("Failed to parse {}", path.display()))?;
 
         if let Some(source) = document.get_mut("source")
-            && let Some(table) = source.as_table_mut() {
-                table["pin"] = toml_edit::value(new_pin);
-            }
+            && let Some(table) = source.as_table_mut()
+        {
+            table["pin"] = toml_edit::value(new_pin);
+        }
 
         fs::write(path, document.to_string())
             .with_context(|| format!("Failed to write {}", path.display()))?;
