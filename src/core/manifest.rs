@@ -90,14 +90,14 @@ impl<'de> Deserialize<'de> for LoadMode {
     where
         D: Deserializer<'de>,
     {
-        let string = String::deserialize(deserializer)?;
-        match string.trim().to_lowercase().as_str() {
+        let s = String::deserialize(deserializer)?;
+        match s.trim().to_lowercase().as_str() {
             "eager" => Ok(LoadMode::Eager),
             "lazy" => Ok(LoadMode::Lazy),
             "event" => Ok(LoadMode::Event),
             _ => Err(serde::de::Error::custom(format!(
                 "invalid load_mode: {}",
-                string
+                s
             ))),
         }
     }
@@ -107,6 +107,8 @@ impl<'de> Deserialize<'de> for LoadMode {
 pub struct LoadMeta {
     #[serde(default)]
     pub load_mode: LoadMode,
+    #[serde(default)]
+    pub events: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default, Clone, PartialEq)]
