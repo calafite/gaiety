@@ -22,7 +22,7 @@ pub fn name_valid(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
-        .map_or(false, |c| c.is_ascii_alphabetic() || c == '_')
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
         && chars.all(valid_fn)
 }
 

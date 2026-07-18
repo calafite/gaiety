@@ -65,8 +65,9 @@ pub fn run(directories: String) -> Result<()> {
     let max_ms: f64 = results.iter().fold(0.0_f64, fold_max);
 
     let filter_deferred = |discovered_module: &&DiscoveredModule| {
-        discovered_module.status == ModuleStatus::Loaded
-            && discovered_module.manifest.api.defer_on_cmd
+        let mode = discovered_module.manifest.load_mode();
+        let not_eager = mode != crate::core::manifest::LoadMode::Eager;
+        discovered_module.status == ModuleStatus::Loaded && not_eager
     };
     let extract_name =
         |discovered_module: &DiscoveredModule| discovered_module.manifest.module.name.clone();

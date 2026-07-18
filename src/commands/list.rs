@@ -74,14 +74,17 @@ impl Helper {
 
     fn format_status(module: &DiscoveredModule) -> String {
         match &module.status {
-            ModuleStatus::Loaded => {
-                let deferred = module.manifest.api.defer_on_cmd;
-                if deferred {
+            ModuleStatus::Loaded => match module.manifest.load_mode() {
+                crate::core::manifest::LoadMode::Lazy => {
                     format!("{:<8}", "lazy").cyan().to_string()
-                } else {
+                }
+                crate::core::manifest::LoadMode::Event => {
+                    format!("{:<8}", "event").blue().to_string()
+                }
+                crate::core::manifest::LoadMode::Eager => {
                     format!("{:<8}", "loaded").green().to_string()
                 }
-            }
+            },
             ModuleStatus::WarnDuplicateDep(_) => format!("{:<8}", "warn").yellow().to_string(),
             ModuleStatus::SkippedMissingCmd(_)
             | ModuleStatus::SkippedMissingAnyCmd(_)

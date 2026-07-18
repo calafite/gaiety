@@ -12,6 +12,16 @@ pub fn run(dirs: String) -> Result<()> {
     }
 
     let zsh_code = loader.generate_init(&modules)?;
+
+    let cache_path = crate::commands::sync::default_cache_path();
+    if let Some(parent) = cache_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+        let lua_path = parent.join("wrapper.lua");
+        let bin = &crate::emitter::zsh::exe_path();
+        let lua_code = include_str!("../templates/wrapper.lua").replace("{{GAIETY_BIN}}", bin);
+        let _ = std::fs::write(&lua_path, &lua_code);
+    }
+
     print!("{}", zsh_code);
     Ok(())
 }

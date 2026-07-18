@@ -100,13 +100,12 @@ impl Helper {
         println!("  {} {}", keyword("deps"), dependencies);
         println!("  {} {}", keyword("tags"), tags);
 
-        let deferred = module.manifest.api.defer_on_cmd;
-        let deferred_text = if deferred {
-            "yes".cyan()
-        } else {
-            "no".dimmed()
+        let mode_text = match module.manifest.load_mode() {
+            crate::core::manifest::LoadMode::Eager => "eager".dimmed(),
+            crate::core::manifest::LoadMode::Lazy => "lazy".cyan(),
+            crate::core::manifest::LoadMode::Event => "event".blue(),
         };
-        println!("  {} {}", keyword("lazy"), deferred_text);
+        println!("  {} {}", keyword("load mode"), mode_text);
     }
 
     fn print_status_reason(status: &ModuleStatus) {

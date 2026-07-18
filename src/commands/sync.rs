@@ -39,6 +39,13 @@ pub fn run(dirs: String, output: Option<PathBuf>) -> Result<()> {
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create cache directory: {}", parent.display()))?;
+
+        let lua_path = parent.join("wrapper.lua");
+        let bin = &crate::emitter::zsh::exe_path();
+        let lua_code = include_str!("../templates/wrapper.lua").replace("{{GAIETY_BIN}}", bin);
+        fs::write(&lua_path, &lua_code).with_context(|| {
+            format!("Failed to write Lua wrapper cache: {}", lua_path.display())
+        })?;
     }
 
     fs::write(&cache_path, &zsh_code)

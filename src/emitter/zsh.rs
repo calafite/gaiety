@@ -28,15 +28,29 @@ impl Loader {
         let stages = Helper::partition_stages(modules);
 
         for (stage_index, stage) in stages.iter().enumerate() {
-            let (lazy, eager): (Vec<_>, Vec<_>) = stage
+            let mut eager = Vec::new();
+            let mut lazy = Vec::new();
+            let mut event = Vec::new();
+
+            for module in stage
                 .iter()
                 .copied()
                 .filter(|module| module.path.join("init.zsh").exists())
-                .partition(|module| module.manifest.api.defer_on_cmd);
+            {
+                match module.manifest.load_mode() {
+                    crate::core::manifest::LoadMode::Eager => eager.push(module),
+                    crate::core::manifest::LoadMode::Lazy => lazy.push(module),
+                    crate::core::manifest::LoadMode::Event => event.push(module),
+                }
+            }
 
             for module in lazy {
                 output.push_str(&Helper::deferred_loader(module));
             }
+
+            // for _module in event {
+            //     // stub
+            // }
 
             output.push_str(&Helper::eager_loader(stage_index, &eager));
 
@@ -101,6 +115,12 @@ impl Loader {
         output.push_str("}\n");
         output
     }
+}
+
+pub fn exe_path() -> String {
+    std::env::current_exe()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|_| Helper::DEFAULT_EXE_NAME.to_string())
 }
 
 struct Helper;
@@ -322,14 +342,8 @@ impl Helper {
         }
     }
 
-    fn exe_path() -> String {
-        std::env::current_exe()
-            .map(|path| path.display().to_string())
-            .unwrap_or_else(|_| Self::DEFAULT_EXE_NAME.to_string())
-    }
-
     fn render_wrapper() -> String {
-        let bin = &Helper::exe_path();
+        let bin = &exe_path();
         include_str!("../templates/wrapper.zsh").replace("{{GAIETY_BIN}}", bin)
     }
 }

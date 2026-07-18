@@ -12,6 +12,8 @@ implicit    = false
 [api]
 functions  = ["help_{{MODULE_NAME}}"]
 variables  = []
-defer_on_cmd = true
 # aliases      = { top = "btop" }
 # completions  = { "help_{{MODULE_NAME}}" = "_files" }
+
+[load]
+load_mode  = "lazy"
