@@ -43,7 +43,7 @@ impl DependencyValidator {
 
             for dependency in &module.manifest.module.deps {
                 match loaded_map.get(dependency.name.as_str()) {
-                    Some(&(_, ref dependency_version)) => {
+                    Some((_, dependency_version)) => {
                         if let Some(constraint) = &dependency.version {
                             match Self::satisfies(dependency_version, constraint) {
                                 Ok(true) => {}
