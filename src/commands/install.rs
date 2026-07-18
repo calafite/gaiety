@@ -624,21 +624,19 @@ impl Helper {
         let is_plugin_zsh = |filename: &String| filename.ends_with(Self::DOT_PLUGIN_ZSH);
         let mut plugin_files = Self::read_filenames(directory).filter(is_plugin_zsh);
 
-        if let Some(first) = plugin_files.next() {
-            if plugin_files.next().is_none() {
+        if let Some(first) = plugin_files.next()
+            && plugin_files.next().is_none() {
                 return Some(first);
             }
-        }
 
         let is_zsh_excluding_init =
             |filename: &String| filename.ends_with(Self::DOT_ZSH) && filename != "init.zsh";
         let mut zsh_files = Self::read_filenames(directory).filter(is_zsh_excluding_init);
 
-        if let Some(first) = zsh_files.next() {
-            if zsh_files.next().is_none() {
+        if let Some(first) = zsh_files.next()
+            && zsh_files.next().is_none() {
                 return Some(first);
             }
-        }
 
         None
     }
