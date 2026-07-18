@@ -1,15 +1,14 @@
-use crate::commands::install::is_valid_name;
-use crate::core::Loader;
-use anyhow::{Result, bail};
+use crate::core::loader::Loader;
+use anyhow::{Context, Result, bail};
 use colored::Colorize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const TOML_TEMPLATE: &str = include_str!("../templates/module.toml");
 const ZSH_TEMPLATE: &str = include_str!("../templates/init.zsh");
 
-pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result<()> {
-    if !is_valid_name(&module_name) {
+pub fn run(directories: String, module_name: String, target: Option<PathBuf>) -> Result<()> {
+    if !crate::core::common::name_valid(&module_name) {
         bail!(
             "{}",
             format!(
@@ -20,55 +19,46 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
         );
     }
 
-    let loader = Loader::new(&dirs)?;
+    let loader = Loader::new(&directories)?;
     let modules = loader.get_modules()?;
 
-    if modules
-        .iter()
-        .any(|m| m.manifest.module.name == module_name)
-    {
+    let matches_module_name = |discovered_module: &crate::core::types::DiscoveredModule| {
+        discovered_module.manifest.module.name == module_name
+    };
+    if modules.iter().any(matches_module_name) {
         bail!(
             "{}",
             format!("Module '{}' is already registered.", module_name).red()
         );
     }
 
-    let write_dir = target.unwrap_or_else(|| loader.default_write_dir().clone());
-    let write_dir_index = loader.dirs.iter().position(|d| d == &write_dir);
+    let default_directory = || loader.default_write().clone();
+    let write_directory = target.unwrap_or_else(default_directory);
 
-    let max_prefix = modules
-        .iter()
-        .filter(|m| match write_dir_index {
-            Some(idx) => m.dir_index == idx,
-            None => m.path.parent().is_some_and(|p| p == write_dir),
-        })
-        .filter_map(|m| m.prefix_order)
-        .max()
-        .unwrap_or(0);
+    let matches_directory = |captured_directory: &PathBuf| captured_directory == &write_directory;
+    let write_index = loader.dirs.iter().position(matches_directory);
 
-    let next_prefix = format!("{:02}", max_prefix + 1);
-    let target_dir_name = format!("{}_{}", next_prefix, module_name);
-    let target_dir = write_dir.join(&target_dir_name);
+    let prefix = crate::core::common::next_prefix(&modules, write_index, &write_directory);
+    let target_directory_name = format!("{:02}_{}", prefix, module_name);
+    let target_directory = write_directory.join(&target_directory_name);
 
-    if target_dir.exists() {
-        bail!("Directory already exists: {}", target_dir.display());
+    if target_directory.exists() {
+        bail!("Directory already exists: {}", target_directory.display());
     }
 
-    fs::create_dir_all(&target_dir)?;
-
-    let toml_content = TOML_TEMPLATE.replace("{{MODULE_NAME}}", &module_name);
-    fs::write(target_dir.join("module.toml"), toml_content)?;
-
-    let zsh_content = ZSH_TEMPLATE.replace("{{MODULE_NAME}}", &module_name);
-    fs::write(target_dir.join("init.zsh"), zsh_content)?;
+    Helper::create_module_files(&target_directory, &module_name)?;
 
     println!("\n{} {}\n", "::".bold().cyan(), "New Module".bold().cyan());
     println!("  {:<10} {}", "name:".dimmed(), module_name.green());
-    println!("  {:<10} {}", "dir:".dimmed(), target_dir_name.green());
+    println!(
+        "  {:<10} {}",
+        "dir:".dimmed(),
+        target_directory_name.green()
+    );
     println!(
         "  {:<10} {}",
         "path:".dimmed(),
-        target_dir.display().to_string().dimmed()
+        target_directory.display().to_string().dimmed()
     );
     println!("  {:<10} module.toml, init.zsh", "files:".dimmed());
     println!(
@@ -81,17 +71,41 @@ pub fn run(dirs: String, module_name: String, target: Option<PathBuf>) -> Result
     Ok(())
 }
 
+struct Helper;
+
+impl Helper {
+    fn create_module_files(target_directory: &Path, module_name: &str) -> Result<()> {
+        let create_error_context = || {
+            format!(
+                "Failed to create target directory: {}",
+                target_directory.display()
+            )
+        };
+        fs::create_dir_all(target_directory).with_context(create_error_context)?;
+
+        let toml_content = TOML_TEMPLATE.replace("{{MODULE_NAME}}", module_name);
+        let toml_path = target_directory.join("module.toml");
+        let toml_error_context = || format!("Failed to write: {}", toml_path.display());
+        fs::write(&toml_path, toml_content).with_context(toml_error_context)?;
+
+        let zsh_content = ZSH_TEMPLATE.replace("{{MODULE_NAME}}", module_name);
+        let zsh_path = target_directory.join("init.zsh");
+        let zsh_error_context = || format!("Failed to write: {}", zsh_path.display());
+        fs::write(&zsh_path, zsh_content).with_context(zsh_error_context)?;
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::commands::install::is_valid_name;
-
     #[test]
     fn test_is_valid_name() {
-        assert!(is_valid_name("my_module"));
-        assert!(is_valid_name("_private_mod"));
-        assert!(is_valid_name("mod123"));
-        assert!(!is_valid_name("123mod"));
-        assert!(!is_valid_name("my-mod"));
-        assert!(!is_valid_name(""));
+        assert!(crate::core::common::name_valid("my_module"));
+        assert!(crate::core::common::name_valid("_private_mod"));
+        assert!(crate::core::common::name_valid("mod123"));
+        assert!(!crate::core::common::name_valid("123mod"));
+        assert!(!crate::core::common::name_valid("my-mod"));
+        assert!(!crate::core::common::name_valid(""));
     }
 }
