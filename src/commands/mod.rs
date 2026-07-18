@@ -1,14 +1,3 @@
-pub mod browse;
-pub mod info;
-pub mod init;
 pub mod install;
-pub mod list;
-pub mod new;
-pub mod path;
-pub mod profile;
-pub mod prune;
-pub mod rename;
-pub mod resolve;
-pub mod rm;
 pub mod sync;
 pub mod update;
