@@ -54,3 +54,26 @@ impl Drop for TempFilesGuard {
         }
     }
 }
+
+pub struct TempFileGuard {
+    path: PathBuf,
+    active: bool,
+}
+
+impl TempFileGuard {
+    pub fn new(path: PathBuf) -> Self {
+        Self { path, active: true }
+    }
+
+    pub fn defuse(&mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for TempFileGuard {
+    fn drop(&mut self) {
+        if self.active && self.path.exists() {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
