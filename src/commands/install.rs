@@ -159,8 +159,8 @@ pub fn install_recursive(
     );
 
     println!("  {:<12} {}", "source:".dimmed(), parsed.url.dimmed());
-    if let Some(ref b) = parsed.branch {
-        println!("  {:<12} {}", "branch:".dimmed(), b.dimmed());
+    if let Some(ref branch) = parsed.branch {
+        println!("  {:<12} {}", "branch:".dimmed(), branch.dimmed());
     }
 
     Helper::clone_repository(&parsed, &temporary_directory)?;
@@ -291,7 +291,7 @@ impl Helper {
             module_directory.display().to_string().dimmed()
         );
 
-        Helper::copy_dir(temporary_directory, &module_directory)?;
+        Self::copy_dir(temporary_directory, &module_directory)?;
 
         let has_toml = module_directory.join("module.toml").exists();
 
@@ -383,12 +383,14 @@ impl Helper {
             let matches_name = |discovered_module: &DiscoveredModule| {
                 discovered_module.manifest.module.name == name
             };
+
             if modules.iter().any(matches_name) {
-                bail!(
-                    "Module '{}' already exists. Remove it with 'gai rm {}' before reinstalling.",
-                    name,
-                    name
+                println!(
+                    "  {:<12} {}",
+                    name.dimmed(),
+                    "already exists (skipping)".dimmed()
                 );
+                continue;
             }
 
             let is_duplicate_incoming = |item: &&(String, &Path)| {
@@ -406,6 +408,14 @@ impl Helper {
             }
 
             incoming.push((name, subdir));
+        }
+
+        if incoming.is_empty() {
+            println!(
+                "\n{} All modules from this collection are already installed.",
+                "✓".bold().green()
+            );
+            return Ok(());
         }
 
         let matches_directory = |captured_directory: &PathBuf| captured_directory == directory;
@@ -595,11 +605,11 @@ impl Helper {
         use std::fmt::Write as _;
         let mut string = String::from("[source]\n");
         let _ = writeln!(string, "url    = \"{}\"", parsed.url);
-        if let Some(ref b) = parsed.branch {
-            let _ = writeln!(string, "branch = \"{}\"", b);
+        if let Some(ref branch) = parsed.branch {
+            let _ = writeln!(string, "branch = \"{}\"", branch);
         }
-        if let Some(p) = pin {
-            let _ = writeln!(string, "pin    = \"{}\"", p);
+        if let Some(pin_val) = pin {
+            let _ = writeln!(string, "pin    = \"{}\"", pin_val);
         }
         string
     }
@@ -679,39 +689,39 @@ mod tests {
 
     #[test]
     fn test_parse_spec_github_shorthand() {
-        let p = ParsedSpec::new("zsh-users/zsh-syntax-highlighting", None).unwrap();
+        let parsed = ParsedSpec::new("zsh-users/zsh-syntax-highlighting", None).unwrap();
         assert_eq!(
-            p.url,
+            parsed.url,
             "https://github.com/zsh-users/zsh-syntax-highlighting.git"
         );
-        assert_eq!(p.repository, "zsh-syntax-highlighting");
-        assert!(p.branch.is_none());
+        assert_eq!(parsed.repository, "zsh-syntax-highlighting");
+        assert!(parsed.branch.is_none());
     }
 
     #[test]
     fn test_parse_spec_with_inline_branch() {
-        let p = ParsedSpec::new("zsh-users/zsh-autosuggestions@develop", None).unwrap();
-        assert_eq!(p.branch.as_deref(), Some("develop"));
+        let parsed = ParsedSpec::new("zsh-users/zsh-autosuggestions@develop", None).unwrap();
+        assert_eq!(parsed.branch.as_deref(), Some("develop"));
     }
 
     #[test]
     fn test_parse_spec_branch_override_wins() {
-        let p =
+        let parsed =
             ParsedSpec::new("zsh-users/zsh-autosuggestions@develop", Some("main".into())).unwrap();
-        assert_eq!(p.branch.as_deref(), Some("main"));
+        assert_eq!(parsed.branch.as_deref(), Some("main"));
     }
 
     #[test]
     fn test_parse_spec_gitlab() {
-        let p = ParsedSpec::new("gitlab:user/repo", None).unwrap();
-        assert!(p.url.starts_with("https://gitlab.com/"));
+        let parsed = ParsedSpec::new("gitlab:user/repo", None).unwrap();
+        assert!(parsed.url.starts_with("https://gitlab.com/"));
     }
 
     #[test]
     fn test_parse_spec_full_url() {
-        let p = ParsedSpec::new("https://github.com/user/repo.git", None).unwrap();
-        assert_eq!(p.url, "https://github.com/user/repo.git");
-        assert_eq!(p.repository, "repo");
+        let parsed = ParsedSpec::new("https://github.com/user/repo.git", None).unwrap();
+        assert_eq!(parsed.url, "https://github.com/user/repo.git");
+        assert_eq!(parsed.repository, "repo");
     }
 
     #[test]
@@ -740,14 +750,14 @@ mod tests {
         fs::create_dir_all(&tmp).unwrap();
 
         for name in &["alpha", "beta"] {
-            let d = tmp.join(name);
-            fs::create_dir_all(&d).unwrap();
+            let dir = tmp.join(name);
+            fs::create_dir_all(&dir).unwrap();
             fs::write(
-                d.join("module.toml"),
+                dir.join("module.toml"),
                 format!("[module]\nname=\"{}\"\nversion=\"1.0.0\"", name),
             )
             .unwrap();
-            fs::write(d.join("init.zsh"), "").unwrap();
+            fs::write(dir.join("init.zsh"), "").unwrap();
         }
 
         fs::create_dir_all(tmp.join("not_a_module")).unwrap();
