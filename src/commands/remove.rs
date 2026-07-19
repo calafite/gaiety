@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 pub fn run(
     directories: String,
-    module_name: String,
+    modules_to_remove: Vec<String>,
     directory_filter: Option<PathBuf>,
     recursive: bool,
 ) -> Result<()> {
@@ -17,34 +17,46 @@ pub fn run(
     let loader = Loader::new(&directories).with_context(loader_context)?;
 
     let modules_context = || "Failed to retrieve modules".to_string();
-    let modules = loader.get_modules().with_context(modules_context)?;
+    let discovered_modules = loader.get_modules().with_context(modules_context)?;
 
-    let target_module = Helper::target_module(&modules, &module_name, &directory_filter)?;
+    let mut unique_names = Vec::new();
+    let mut seen_names = HashSet::new();
+    for name in modules_to_remove {
+        if seen_names.insert(name.clone()) {
+            unique_names.push(name);
+        }
+    }
+
+    let mut target_modules = Vec::new();
+    for name in &unique_names {
+        let target = Helper::target_module(&discovered_modules, name, &directory_filter)?;
+        target_modules.push(target);
+    }
 
     let removals = if recursive {
-        Helper::calculate_cascade(&modules, &target_module.manifest.module.name)
+        Helper::calculate_cascade(&discovered_modules, &unique_names)
     } else {
-        vec![target_module.manifest.module.name.clone()]
+        unique_names.clone()
     };
 
     println!(
         "\n{} {}\n",
         "::".bold().cyan(),
-        "Remove Module".bold().cyan()
+        "Remove Modules".bold().cyan()
     );
-    println!("  {:<10} {}", "target:".dimmed(), module_name.green());
-    if removals.len() > 1 {
+    println!("  {:<10} {}", "targets:", unique_names.join(", ").green());
+    if removals.len() > unique_names.len() {
+        let cascading_targets = removals[unique_names.len()..].join(", ");
+        println!("  {:<10} {}", "cascading:", cascading_targets.yellow());
+    }
+    for target in &target_modules {
         println!(
             "  {:<10} {}",
-            "cascading:".dimmed(),
-            removals[1..].join(", ").yellow()
+            "path:",
+            target.path.display().to_string().dimmed()
         );
     }
-    println!(
-        "  {:<10} {}\n",
-        "path:".dimmed(),
-        target_module.path.display().to_string().dimmed()
-    );
+    println!();
 
     print!(
         "{} Remove {} module(s)? [y/N] ",
@@ -63,7 +75,7 @@ pub fn run(
 
     let confirmed = input.trim().eq_ignore_ascii_case("y");
     if confirmed {
-        Helper::perform_removal(&modules, &removals)?;
+        Helper::perform_removal(&discovered_modules, &removals)?;
         println!("{} removed\n", "✓".bold().green());
     } else {
         println!("{} aborted\n", "!".bold().yellow());
@@ -147,8 +159,8 @@ impl Helper {
         }
     }
 
-    fn calculate_cascade(modules: &[DiscoveredModule], start_name: &str) -> Vec<String> {
-        let mut removals = vec![start_name.to_string()];
+    fn calculate_cascade(modules: &[DiscoveredModule], start_names: &[String]) -> Vec<String> {
+        let mut removals = start_names.to_vec();
 
         let mut in_degrees = HashMap::new();
         for module in modules {
@@ -160,9 +172,11 @@ impl Helper {
             }
         }
 
-        let mut queue = vec![start_name.to_string()];
+        let mut queue = start_names.to_vec();
         let mut removed_set = HashSet::new();
-        removed_set.insert(start_name.to_string());
+        for name in start_names {
+            removed_set.insert(name.clone());
+        }
 
         while let Some(current_name) = queue.pop() {
             let find_predicate = |discovered_module: &&DiscoveredModule| {
@@ -229,12 +243,12 @@ mod tests {
     #[test]
     fn test_renumber_modules() {
         let temp = create_temp_directory("renumber");
-        let m1 = temp.join("05_foo");
-        let m2 = temp.join("12_bar");
-        fs::create_dir_all(&m1).unwrap();
-        fs::create_dir_all(&m2).unwrap();
-        fs::write(m1.join("module.toml"), "").unwrap();
-        fs::write(m2.join("module.toml"), "").unwrap();
+        let module1 = temp.join("05_foo");
+        let module2 = temp.join("12_bar");
+        fs::create_dir_all(&module1).unwrap();
+        fs::create_dir_all(&module2).unwrap();
+        fs::write(module1.join("module.toml"), "").unwrap();
+        fs::write(module2.join("module.toml"), "").unwrap();
 
         renumber_modules(&temp).unwrap();
 

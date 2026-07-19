@@ -92,10 +92,11 @@ pub enum Commands {
         target: Option<PathBuf>,
     },
 
-    /// Remove a module and renumber the remaining modules in its directory
+    /// Remove one or more modules and renumber the remaining modules in their directories
     Rm {
-        /// Name of the module to remove
-        module: String,
+        /// Names of the modules to remove
+        #[arg(required = true)]
+        modules: Vec<String>,
         /// Restrict the search to this directory (useful when the same name
         /// exists in multiple GAI_DIRS entries)
         #[arg(short, long)]
@@ -140,10 +141,10 @@ pub fn execute(cli: Cli) -> Result<()> {
         Commands::Update { module } => update::run(cli.dirs, module),
         Commands::New { module, target } => new::run(cli.dirs, module, target),
         Commands::Rm {
-            module,
+            modules,
             dir,
             recursive,
-        } => remove::run(cli.dirs, module, dir, recursive),
+        } => remove::run(cli.dirs, modules, dir, recursive),
         Commands::Prune => prune::run(cli.dirs),
         Commands::Resolve => resolve::run(cli.dirs),
         Commands::Rename { old, new } => rename::run(cli.dirs, old, new),
