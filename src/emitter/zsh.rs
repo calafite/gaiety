@@ -91,8 +91,8 @@ impl Loader {
             let loaded = module.status == ModuleStatus::Loaded;
             let event_mode = module.manifest.load_mode() == crate::core::manifest::LoadMode::Event;
 
-            if loaded && event_mode {
-                if let Some(ref load) = module.manifest.load {
+            if loaded && event_mode
+                && let Some(ref load) = module.manifest.load {
                     for event in &load.events {
                         let native_hook = if event.starts_with("periodic") {
                             "periodic".to_string()
@@ -105,7 +105,6 @@ impl Loader {
                             .push((event.clone(), module));
                     }
                 }
-            }
         }
 
         if subscribers.is_empty() {
@@ -234,8 +233,7 @@ impl Loader {
         for module in modules {
             if module.status == ModuleStatus::Loaded
                 && module.manifest.load_mode() == crate::core::manifest::LoadMode::Event
-            {
-                if let Some(ref load_meta) = module.manifest.load {
+                && let Some(ref load_meta) = module.manifest.load {
                     for event in &load_meta.events {
                         if event.starts_with("periodic") {
                             active_hooks.insert("periodic".to_string());
@@ -252,7 +250,6 @@ impl Loader {
                         }
                     }
                 }
-            }
         }
 
         if !active_hooks.is_empty() {
