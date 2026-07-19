@@ -72,6 +72,9 @@ variables = []
 # load_mode can be "eager", "lazy", or "event"
 load_mode = "lazy"
 
+# if load_mode = "event", define the zsh hooks to subscribe to:
+# events = ["chpwd", "precmd", "periodic:30"]
+
 # managed by gai install ~ do not edit manually
 # [source]
 # url = "https://github.com/user/repo.git"
@@ -308,7 +311,15 @@ Use `gai profile` to identify slow modules and decide which ones to make lazy.
 
 ## Loading modes
 
-Setting `load_mode = "lazy"` in `[load]` tells gaiety not to source the module's `init.zsh` at shell startup. Instead, thin stub functions are generated for every name in `functions`, `aliases`, and `completions`. The first time any of those names is invoked, the real `init.zsh` is sourced and the call is forwarded transparently.
+Gaiety supports three loading behaviors configured via the `load_mode` field under the `[load]` block.
+
+### 1. Eager Loading (`load_mode = "eager"`)
+
+The module is sourced immediately on shell startup. Use this if your module needs to run initialization logic immediately, set up custom shell keybindings, or configure shell environment variables.
+
+### 2. Lazy Loading (`load_mode = "lazy"`)
+
+The module is not sourced at shell startup. Instead, thin placeholder functions are generated for every name declared in `functions`, `aliases`, and `completions`. On first use, the loader intercepts the call, sources the module's real `init.zsh`, unfunctions the stubs, and forwards the command execution transparently.
 
 ```toml
 [api]
@@ -318,11 +329,39 @@ functions = ["ls", "ll", "la"]
 load_mode = "lazy"
 ```
 
-This is safe for modules that only define functions or aliases. It is **not** appropriate for modules that need to run code eagerly at startup; for example, modules that export variables, call `eval "$(tool init zsh)"`, or set up keybindings. Those modules should use `load_mode = "eager"`.
+### 3. Event Loading (`load_mode = "event"`)
 
-Setting `load_mode = "event"` is for modules that subscribe to specific system events (future feature).
+The module is sourced on-demand only when a subscribed Zsh hook or timer event occurs. Subscriptions are declared inside the `events` array under the `[load]` block:
 
-`gai list` shows lazy modules with the status `lazy`. `gai info <name>` shows `load mode      lazy` in the metadata block. `gai profile` marks non-eager modules with `(def)` and reports their deferred source time.
+```toml
+[load]
+load_mode = "event"
+events = ["chpwd", "preexec", "periodic:30"]
+```
+
+#### Centralized Hook Dispatching
+Rather than registering separate hook triggers for every individual module (which degrades startup and runtime performance), Gaiety precomputes active hook mappings at sync-time and registers **exactly one dispatcher function per native Zsh hook** (`chpwd`, `precmd`, `preexec`, `zshaddhistory`, `zshexit`, `periodic`).
+
+#### Callback Protocol
+When an event occurs, the loader evaluates your module's `init.zsh` (if not already sourced) and immediately calls the associated event handler callback if defined in your script.
+
+The callback function name is constructed as `_gai_event_<module_name>_<event_name>` (with any `:` character replaced by `_`):
+
+* Subscribing to `"chpwd"` triggers `_gai_event_<module_name>_chpwd`.
+* Subscribing to `"periodic:30"` triggers `_gai_event_<module_name>_periodic_30`.
+
+Arguments supplied to the native hook (such as the command string in `preexec`) are passed down to your callback function as parameters:
+
+```zsh
+# Inside 02_zoxide/init.zsh
+_gai_event_zoxide_preexec() {
+  local command_line="$1"
+  # Custom preexec tracing logic
+}
+```
+
+#### Synthetic Timers (`periodic:N`)
+To run recurring tasks, you can use the `"periodic:N"` event source, where `N` is the desired interval in seconds. Gaiety automatically hooks into Zsh's native `periodic` driving engine, registers standard interval tracking variables using `$EPOCHSECONDS`, and sets up the native hook interval (`PERIOD=1`) as a background driver without overwriting your custom `PERIOD` configurations.
 
 ---
 
@@ -356,7 +395,7 @@ gai reload
 gai reload mything
 ```
 
-When reloading everything, gaiety calls `_gai_reset` (unsets all registered functions, variables and aliases), then re-evaluates `gaiety init`. When reloading a single module, it just sources that module's `init.zsh` directly.
+When reloading everything, gaiety calls `_gai_reset` (unsets all registered functions, variables and aliases, unregisters event hooks, and unsets tracking states), then re-evaluates `gaiety init`. When reloading a single module, it just sources that module's `init.zsh` directly.
 
 ---
 
